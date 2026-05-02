@@ -22,9 +22,17 @@ EXECUTION_LAG = 1
 EMBARGO_DAYS = HORIZON_DAYS
 
 # -- Walk-forward CV --
-N_FOLDS = 5
-INITIAL_TRAIN_YEARS = 3.0
-TEST_PERIOD_MONTHS = 3
+# Sizes expressed in TRADING DAYS, not calendar units. The fold
+# generator works on integer positions in the sorted-dates array;
+# converting calendar lengths to trading-day counts here means the
+# generator never has to think about holidays.
+#
+# Conversions used:
+#   1 trading year ≈ 252 days
+#   1 trading month ≈ 21 days
+N_FOLDS              = 5
+INITIAL_TRAIN_DAYS   = 756        # ~3 trading years
+TEST_DAYS            = 126        # ~6 trading months
 
 
 # -- Reproducibility --
