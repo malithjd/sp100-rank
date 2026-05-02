@@ -58,29 +58,38 @@ def rsi(close: pd.Series, window: int = 14) -> pd.Series:
     Causal: .diff() and .ewm() both use only past data.
 
     Why ewm with adjust=False, alpha=1/window:
-      - Wilder's original 1978 RSI uses a recursive smoother with
-        alpha=1/N. pandas's ewm with adjust=False matches that
-        formulation exactly. adjust=True gives a different (unbiased
-        exponential mean) which is NOT the standard RSI definition.
-      - .rolling(window).mean() would give the SMA-RSI variant, also
-        different. Wilder is more standard in academic and TA-Lib
-        contexts; we use it for compatibility.
+      Wilder's original 1978 RSI uses a recursive smoother with
+      alpha=1/N. pandas's ewm with adjust=False matches that
+      formulation exactly. adjust=True or .rolling().mean() would
+      give different (non-Wilder) variants.
+
+    NaN handling: warmup rows (first ~window rows) are returned as
+    NaN — there isn't enough history yet. The "no losses in window"
+    edge case (avg_loss == 0, RSI=100 by convention) only fires
+    AFTER warmup, when avg_gain is well-defined but avg_loss happens
+    to be exactly zero. We detect this case by checking that
+    avg_gain is non-NaN before promoting to 100.
     """
     delta = close.diff()
-    # .clip(lower=0) returns max(x, 0) elementwise, vectorized.
-    # -delta.clip(upper=0) gives the loss leg as positive numbers.
     gain = delta.clip(lower=0.0)
     loss = -delta.clip(upper=0.0)
 
     avg_gain = gain.ewm(alpha=1.0 / window, adjust=False, min_periods=window).mean()
     avg_loss = loss.ewm(alpha=1.0 / window, adjust=False, min_periods=window).mean()
 
-    # Avoid div-by-zero. When avg_loss == 0 (a strong uptrend with
-    # no losses in window), RSI is conventionally 100.
+    # Handle div-by-zero: when avg_loss is exactly 0 BUT we're past
+    # warmup (avg_gain is non-NaN), conventionally RSI = 100.
+    # When avg_loss is NaN (warmup), leave as NaN — that's the bug
+    # the previous fillna(100) accidentally papered over.
     rs = avg_gain / avg_loss.replace(0, np.nan)
-    out = 100.0 - 100.0 / (1.0 + rs)
-    out = out.fillna(100.0)
-    return out
+    rsi_value = 100.0 - 100.0 / (1.0 + rs)
+
+    # Targeted promotion: where avg_gain is defined but avg_loss is
+    # zero (i.e., past warmup, no losses), set to 100.
+    no_losses = (avg_loss == 0) & avg_gain.notna()
+    rsi_value = rsi_value.where(~no_losses, 100.0)
+
+    return rsi_value
 
 
 def macd_signal_line(
