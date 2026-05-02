@@ -33,6 +33,12 @@ data/processed/*
 !data/processed/selected_features.json
 !data/processed/tuned_hyperparameters.json
 !data/processed/fold_ic_summary.csv
+!data/processed/shap_stability_rf.csv
+!data/processed/shap_ranks_rf.csv
+!data/processed/portfolio_diagnostics.csv
+# !data/processed/holdout_predictions_rf.parquet
+# !data/processed/holdout_ic_rf.parquet
+!data/processed/holdout_ic_rf.csv
 
 models/checkpoints/*
 !models/checkpoints/.gitkeep

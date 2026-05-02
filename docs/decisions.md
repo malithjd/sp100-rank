@@ -303,3 +303,74 @@ unbiased estimate.
   - XGBoost:        max_depth = 4, learning_rate = 0.10
   - LightGBM:       num_leaves = 15, learning_rate = 0.05
 
+  ---
+
+## ADR-011: Phase 5 evaluation results (2026-04-30)
+**Decision**: Random Forest is the lead model based on combined IC,
+ICIR, regime stability, and held-out evaluation. Linear baseline
+shows surprising portfolio Sharpe leadership but regime instability;
+documented as a finding rather than a recommendation.
+
+**Walk-forward IC by year**:
+  | Model  | 2021    | 2022    | 2023    |
+  |--------|---------|---------|---------|
+  | Linear | +0.017  | +0.061  | -0.063  |
+  | RF     | +0.040  | +0.045  | -0.022  |
+  | XGB    | +0.031  | +0.032  | -0.026  |
+  | LGB    | +0.051  | +0.021  | -0.029  |
+  
+  All four models lose skill in 2023. The 2023 AI rally (NVDA-led
+  mega-cap concentration) breaks factor-style cross-sectional ranking.
+
+**Regime breakdown — IC by Trend × Vol cell** (RF only):
+  - bear/high_vol: +0.033 (best)
+  - bull/high_vol: +0.016
+  - bear/low_vol:  +0.012
+  - bull/low_vol:  +0.016
+  
+  RF is the only model with positive IC in all 4 regime cells.
+
+**SHAP stability**:
+  - log_dollar_vol_60: ranks 1-2 across all 5 folds (stable; robust)
+  - drawdown_60:       rank 8 across all 5 folds (consistently weakest)
+  - mom_12_1, pct_52w_high: rank swings widely (regime-dependent)
+  - macd_signal, beta_to_spx_60: moderately stable middle
+
+**Decile long-short portfolio (32 non-overlapping 20-day periods)**:
+  - Linear: Sharpe 0.92 / 0.86 / 0.79 at 0/5/10 bps
+  - LGB:    Sharpe 0.72 / 0.63 / 0.54
+  - RF:     Sharpe 0.52 / 0.43 / 0.35
+  - XGB:    Sharpe 0.48 / 0.39 / 0.30
+  
+  IC and Sharpe rankings disagree: Linear has the best tails
+  (largest top-decile minus bottom-decile spread) despite weakest IC.
+  This reflects different aspects of model behavior — IC measures
+  full-cross-section ranking, Sharpe measures tail discrimination.
+
+**Hold-out evaluation (RF trained on 2018-2023, evaluated 2024-2026)**:
+  - 2024 mean IC: -0.021 (negative — confirms regime-transfer concern)
+  - 2025 mean IC: +0.017
+  - 2026 Q1 IC:   +0.136 (small-sample, only 40 days)
+  - Full hold-out IC: +0.008, ICIR 0.05, t-stat 1.24
+  
+  The hold-out cannot reject H0: alpha = 0. This is the honest
+  unbiased estimate. The walk-forward IC was inflated by selection
+  effects (Fold 1 hyperparameter tuning, fold 1-5 within a single
+  macro regime). The 2024 negative IC is the project's most
+  important caveat.
+
+**Reasoning for RF lead despite Linear's higher Sharpe**:
+  - RF has positive IC in all 4 regime cells; Linear has 2 negative cells.
+  - RF's hold-out 2024 IC is also negative, but less severely than
+    Linear would be (we did not compute Linear hold-out, but its
+    2023 walk-forward IC of -0.063 is much worse than RF's -0.022).
+  - Sharpe estimate on 32 periods has SE ~0.3; the 0.40 spread
+    between Linear and RF Sharpe is barely outside one SE.
+  - Regime robustness matters more for production deployment than
+    a one-off Sharpe number.
+
+**What we'd do differently in v2**: tighter regime coverage in
+training (2008-2015 history with point-in-time membership), explicit
+regime-conditional models, more frequent retraining cadence than
+quarterly.
+
