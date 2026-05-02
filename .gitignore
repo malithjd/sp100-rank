@@ -1,0 +1,40 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# --- macOS ---
+.DS_Store
+._*
+
+# --- VS Code (keep workspace settings, ignore user-local stuff) ---
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# --- Project data + models (large, regenerable) ---
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+models/checkpoints/*
+!models/checkpoints/.gitkeep
+
+# --- Outputs ---
+outputs/
+figures/
+*.log
