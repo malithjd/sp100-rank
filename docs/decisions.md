@@ -330,6 +330,21 @@ documented as a finding rather than a recommendation.
   
   RF is the only model with positive IC in all 4 regime cells.
 
+**Cell sample-size caveats**: The four trend×vol cells are highly
+unbalanced — bull/low_vol has 355 days, bear/high_vol 194, bull/high_vol
+73, bear/low_vol just 8 days. The bear/low_vol cell is unreliable
+(SE of mean Spearman ≈ 0.30 at n=8); we exclude it from
+interpretation. The 73-day bull/high_vol cell warrants caveats but
+is interpretable. The two well-populated cells (bull/low_vol and
+bear/high_vol) carry the substantive findings.
+
+This imbalance is itself a finding: the test period (Feb 2021 - Nov
+2023) was dominated by bull / low_vol regime (355 days, 56% of
+total), with bear / high_vol the natural "second mode" (194 days,
+31%). The other two cells are transition periods, rare by
+construction.
+
+
 **SHAP stability**:
   - log_dollar_vol_60: ranks 1-2 across all 5 folds (stable; robust)
   - drawdown_60:       rank 8 across all 5 folds (consistently weakest)
