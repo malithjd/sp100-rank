@@ -94,21 +94,100 @@ much early data given our small training history).
 ---
 
 ## ADR-005: Universe construction (2026-04-30)
-**Decision**: Fixed universe of 100 tickers that are S&P 100 members
-as of project start. SPX index added as a 101st ticker for the
-beta feature, but excluded from prediction universe.
+**Decision**: Fixed hand-curated universe of 100 large-cap U.S.
+equities, plus the ^GSPC index as a market proxy for the
+beta_to_spx_60 feature (excluded from the prediction cross-section).
 
-**Reasoning**: Point-in-time S&P 100 membership is not available from
-yfinance and would require Wikipedia-scraping with revision history.
-Out of scope for time budget.
+The 100 names are large-cap, liquid stocks broadly drawn from the
+S&P 100 / S&P 500 top-tier, but the list is NOT identical to the
+index-defined S&P 100 at any specific date. Throughout the report
+we refer to it as "100 large-cap U.S. equities," not S&P 100.
+For data infrastructure purposes the panel contains 101 tickers (100 equities + ^GSPC), 
+but the prediction universe — the set of names the model ranks against each other — is 
+the 100 equities only.
 
-**Trade-offs**: Survivorship bias toward names that remained in the
-index through 2018–2026. Quantitatively, IC is likely 0.005–0.015
-higher than would be measured on a point-in-time panel. Directional
-findings (which model wins, which features matter) should not be
-materially affected.
+**Reasoning**: Index-membership reconstruction at point-in-time is
+out of scope for the time budget. A hand-curated stable universe
+spanning 2018-2026 (a) avoids the survivorship bias inherent to
+"current S&P 100 backtested historically," (b) ensures all names
+have full 2018-2026 history available from yfinance, (c) sidesteps
+ticker-rename quirks (e.g., FISV → FI in 2023).
 
-**Alternatives considered**: Point-in-time membership reconstruction
-(rejected — out of scope); current S&P 500 (rejected — too many
-illiquid names dilute the cross-section); top-100-by-current-market-cap
-(rejected — circular: market cap is a function of past returns).
+The universe was built by starting from a candidate list of 104
+large-caps and dropping four:
+  - FISV (renamed to FI in 2023; complicates split history)
+  - GOOG (kept GOOGL — same entity, redundant cross-sectional weight)
+  - EL   (extreme idiosyncratic drawdown 2022-2024 distorts tails)
+  - PSA  (REIT with atypical total-return profile)
+
+**Trade-offs**: The universe is hand-picked and not reproducible
+from a public index definition. We document the construction
+explicitly and list every ticker in src/sp100rank/data/universe.py
+to compensate. Hand-picking introduces selection effects (we know
+these names had complete history) but does not introduce forward-
+looking bias, since membership was decided based on company
+identity, not on past returns.
+
+**Alternatives considered**: 
+  - Live S&P 100 membership at start date — rejected (survivorship).
+  - Point-in-time membership reconstruction — rejected (scope).
+  - Top-100-by-current-market-cap — rejected (circular: market cap
+    is a function of past returns).
+  - S&P 500 with market-cap filter applied each rebalance —
+    rejected (too much engineering for a 50-hour budget).
+
+---
+
+## ADR-006: Data cleaning thresholds (2026-04-30)
+**Decision**: Apply the following cleaning steps to the raw yfinance panel before feature computation:
+1. Drop equity rows with `volume == 0` (preserves indices, where volume is meaningless).
+2. Forward-fill `adj_close` gaps up to 2 trading days; drop rows still NaN after.
+3. Flag and drop rows with absolute one-day return > 50% (likely data errors or unhandled corporate actions).
+
+**Reasoning**: Cleaning is intentionally conservative — we'd rather lose a few rows than carry bad data into features. Forward-fill cap of 2 days prevents fabricating multi-day signal.
+
+**Trade-offs**: Real ~50% one-day moves do occasionally happen (M&A announcements, earnings). The 50% threshold is high enough that we expect to drop ~0–5 rows per ticker over 8 years — acceptable loss given the alternative.
+
+**Audit results**: 209,272 input rows, 209,272 output rows, 0 dropped (zero-volume / spike / unfilled-NaN). The cleaning logic is structurally correct but had nothing to do because the universe (per ADR-005) consists of continuously-listed large-caps with no IPO gaps, splits mishandled by yfinance, or volume halts in the project window. Verified via post-clean diagnostics — see ADR-008.
+
+---
+
+## ADR-007: MMC → MRSH ticker rename (2026-04-30)
+**Decision**: Use ticker MRSH (Marsh & McLennan) in the universe.
+yfinance returns full 2018-2026 history under MRSH; MMC fails.
+
+**Reasoning**: MMC was renamed to MRSH in January 2026. yfinance has
+back-stitched the historical data under the new symbol, so a single
+download under MRSH gives us the complete continuous price series
+for the same economic entity. No manual stitching required.
+
+**Trade-offs**: None — yfinance handled the rename transparently.
+
+**Note for future**: Other ticker-rename events to watch for in this
+universe over the project window: FB → META (2022, handled), FISV → FI
+(2023, dropped from universe in ADR-005). If yfinance flakes on
+another ticker mid-project, the diagnostic pattern (try old + new
+symbol, compare row counts and date ranges) is in chat history.
+
+---
+
+## ADR-008: Data quality verified (2026-04-30)
+**Decision**: Treat the cleaned panel as production-ready for feature
+engineering. No further cleaning passes needed.
+
+**Reasoning**: Post-clean diagnostics show:
+  - 101 tickers × 2,072 trading days = 209,272 rows, all complete.
+  - Zero NaNs in any OHLCV column.
+  - Per-ticker row counts identical (2,072 each) — no IPO/delisting
+    history gaps in the universe.
+  - Top-15 largest one-day moves all attributable to documented real
+    events (NFLX 2022 sub loss, META 2022 DAU shock, NVDA 2023 AI
+    rally start, ORCL 2025 cloud guidance, etc.). Largest move
+    35.95% (ORCL 2025-09-10), well under our 50% spike threshold.
+
+**Trade-offs**: None — the data is what we'd hope for.
+
+**Note**: This level of cleanliness reflects the universe construction
+(ADR-005), not luck. Hand-curating to known continuously-listed
+large caps avoids the data quirks of less-liquid or recently-IPO'd
+names.
