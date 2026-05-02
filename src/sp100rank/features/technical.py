@@ -114,6 +114,77 @@ def macd_signal_line(
     macd_line = ema_fast - ema_slow
     return macd_line.ewm(span=signal, adjust=True, min_periods=signal).mean()
 
+def volume_ratio(volume: pd.Series, window: int = 20) -> pd.Series:
+    """Current volume relative to its trailing N-day average.
+
+    Formula: volume_t / mean(volume_{t-N+1 ... t})
+
+    Note: window=20 means the rolling mean INCLUDES today's volume.
+    That's deliberate. We're asking "is today's volume notable
+    relative to recent history including today?" not "is today's
+    volume notable relative to history before today?" Both are
+    causal — they only use data up to t. Conventional version uses
+    inclusive window.
+
+    Why this matters: a stock making a price move on 3x normal
+    volume is conveying conviction; the same move on half normal
+    volume might be noise. Volume ratio captures this.
+
+    Causal: .rolling(N) at row t looks at rows t-N+1 through t,
+    never beyond t.
+    """
+    avg = volume.rolling(window=window, min_periods=window).mean()
+    # Avoid division by zero on the rare zero-volume days that survive
+    # cleaning (e.g., index rows where volume is meaningless).
+    return volume / avg.replace(0, np.nan)
+
+
+def pct_52w_high(close: pd.Series, window: int = 252) -> pd.Series:
+    """Current price as a fraction of its 52-week trailing high.
+
+    Formula: close_t / max(close_{t-251 ... t})
+
+    Range: (0, 1]. A value of 1.0 means we're AT the 52-week high.
+    A value of 0.7 means we're 30% below it.
+
+    Why this works as a feature: the "52-week high" is a salient
+    psychological anchor for traders. Stocks within a few percent of
+    their 52-week high tend to attract buying; stocks far below
+    their high are often in down-trends (George & Hwang 2004,
+    Journal of Finance — "The 52-Week High and Momentum Investing").
+
+    252 trading days ≈ 1 calendar year. Inclusive window is the
+    conventional definition.
+
+    Causal: rolling max at t uses only past + current data.
+    """
+    rolling_high = close.rolling(window=window, min_periods=window).max()
+    return close / rolling_high
+
+
+def drawdown(close: pd.Series, window: int = 60) -> pd.Series:
+    """Current drawdown from N-day trailing high.
+
+    Formula: (close_t / max(close_{t-N+1 ... t})) - 1
+
+    Range: [-1, 0]. Always non-positive. -0.10 means we're 10% below
+    the trailing high; 0 means we're at the high.
+
+    Different from pct_52w_high because:
+      - Shorter window (60 days vs 252) captures shorter-term pain
+      - Subtracts 1 so 0 == "at the high" (sign-natural for the
+        downside-only interpretation)
+      - Two complementary features rather than redundant ones —
+        a stock can be near its 52-week high while in a 60-day
+        drawdown (or vice versa), and that combination is
+        informative.
+
+    Causal: same as pct_52w_high.
+    """
+    rolling_high = close.rolling(window=window, min_periods=window).max()
+    return (close / rolling_high) - 1.0
+
+
 
 
 def compute_all_features(prices: pd.DataFrame) -> pd.DataFrame:
