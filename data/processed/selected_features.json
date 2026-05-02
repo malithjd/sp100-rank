@@ -1,0 +1,29 @@
+{
+  "selected_features": [
+    "log_dollar_vol_60",
+    "beta_to_spx_60",
+    "realized_vol_20",
+    "mom_12_1",
+    "macd_signal",
+    "pct_52w_high",
+    "mom_60",
+    "drawdown_60"
+  ],
+  "all_features_with_importance": {
+    "log_dollar_vol_60": 2654.479932449758,
+    "beta_to_spx_60": 1987.085095640272,
+    "realized_vol_20": 1464.8950030654669,
+    "mom_12_1": 1457.0309023037553,
+    "macd_signal": 1347.7446752414107,
+    "pct_52w_high": 1084.2333457916975,
+    "mom_60": 1004.9013963341713,
+    "drawdown_60": 458.9962277337909,
+    "rsi_14": 416.928490459919,
+    "bb_position_20": 303.49283707141876,
+    "rev_5": 123.44650216400623,
+    "vol_ratio_20": 104.51221424341202
+  },
+  "selection_method": "lightgbm_gain_importance",
+  "selection_period_start": "2018-01-02",
+  "selection_period_end": "2020-12-31"
+}
