@@ -184,6 +184,91 @@ def drawdown(close: pd.Series, window: int = 60) -> pd.Series:
     rolling_high = close.rolling(window=window, min_periods=window).max()
     return (close / rolling_high) - 1.0
 
+def short_term_reversal(close: pd.Series, window: int = 5) -> pd.Series:
+    """N-day reversal signal: short-window momentum, sign-flipped.
+
+    Formula: -(close_t / close_{t-N} - 1)
+                 ^
+                 leading minus: a stock that just rose 3% has reversal
+                 = -3% (i.e., we expect it to give some back).
+
+    Why sign-flipped: at SHORT horizons (1-5 days), returns
+    mean-revert. Stocks that ran up tend to dip; stocks that fell
+    tend to bounce. This is the OPPOSITE of medium-horizon momentum
+    (60 days, where winners keep winning). The sign flip makes the
+    feature directly comparable to the momentum features — high
+    values predict outperformance for both.
+
+    Reference: Jegadeesh (1990, J. of Finance — "Evidence of
+    Predictable Behavior of Security Returns") established 1-month
+    reversal. The 5-day version captures even shorter mean-reversion.
+
+    Causal: pct_change at t uses only close[t] and close[t-N].
+    """
+    return -close.pct_change(periods=window)
+
+
+def bollinger_position(close: pd.Series, window: int = 20) -> pd.Series:
+    """Position within Bollinger Bands.
+
+    Formula: (close_t - SMA_N(close)) / (2 * std_N(close))
+
+    Range: typically ~[-1, +1] when inside the bands; can exceed in
+    strong moves. Value of 0 = at the center (mean). +1 = at the
+    upper band (2 std above mean). -1 = at the lower band.
+
+    Why this matters: classical Bollinger Band trading strategy
+    interprets prices outside the bands as "stretched" and likely
+    to revert. As a feature, this gives the model a normalized
+    measure of "how unusual is the current price relative to recent
+    typical prices for THIS stock?"
+
+    Subtle point on standardization: each ticker is standardized
+    against ITS OWN history, not the cross-section. A high-volatility
+    stock and a low-volatility stock both produce values in roughly
+    the same range, making the feature cross-sectionally comparable.
+
+    Causal: rolling mean and rolling std at t use rows ≤ t only.
+    """
+    sma = close.rolling(window=window, min_periods=window).mean()
+    std = close.rolling(window=window, min_periods=window).std(ddof=0)
+    # ddof=0 = population std (consistent with the original Bollinger
+    # 1980s definition). ddof=1 (sample std) would inflate slightly
+    # at the start of the window. Difference is negligible at N=20
+    # but matches the textbook formula.
+    return (close - sma) / (2.0 * std.replace(0, np.nan))
+
+
+def mom_12_1(close: pd.Series) -> pd.Series:
+    """12-month momentum, skipping the most recent 1 month.
+
+    Formula: close_{t-21} / close_{t-252} - 1
+
+    The "12-1" name: 12 months total lookback, but we skip the
+    most-recent 1 month. Why skip? Because of the Jegadeesh (1990)
+    short-term reversal effect — the most recent month's return is
+    a NEGATIVE predictor at short horizons. Including it dilutes
+    the medium-horizon momentum signal. Skipping it isolates the
+    "winners keep winning" effect from the "winners temporarily
+    pause" effect.
+
+    This is the GOLD STANDARD momentum specification in academic
+    asset pricing — used in Fama-French momentum factor (UMD),
+    Asness-Moskowitz-Pedersen (2013) "Value and Momentum
+    Everywhere," and most empirical asset-pricing studies since.
+
+    Causal: .shift(N) brings PAST values into the current row.
+    .shift(21) at row t = close[t-21]. .shift(252) at t = close[t-252].
+    Both are pure backward-looking.
+    """
+    # close shifted by 21 days = "close from 21 days ago"
+    close_t_minus_21  = close.shift(21)
+    # close shifted by 252 days = "close from 252 days ago"
+    close_t_minus_252 = close.shift(252)
+
+    # The momentum is the return from t-252 to t-21.
+    return (close_t_minus_21 / close_t_minus_252) - 1.0
+
 
 
 
@@ -228,10 +313,14 @@ def _features_for_one_ticker(df: pd.DataFrame) -> pd.DataFrame:
     out["macd_signal"] = macd_signal_line(close)
 
     # === Batch 2 — Volume + position features ===
-    # (will add)
+    out["vol_ratio_20"]   = volume_ratio(volume, window=20)
+    out["pct_52w_high"]   = pct_52w_high(close, window=252)
+    out["drawdown_60"]    = drawdown(close, window=60)
 
     # === Batch 3 — New momentum/reversal features ===
-    # (will add)
+    out["rev_5"]          = short_term_reversal(close, window=5)
+    out["bb_position_20"] = bollinger_position(close, window=20)
+    out["mom_12_1"]       = mom_12_1(close)
 
     # === Batch 4 — Risk + liquidity features ===
     # (will add)
