@@ -231,3 +231,32 @@ cost of less stable per-fold IC.
   - Rolling (not expanding) train windows (rejected per ADR-002).
   - Using all data in walk-forward, no hold-out (rejected: the hold-
     out is the only unbiased final evaluation we get).
+
+**Regime coverage caveat**: The 5 test folds span Feb 2021 – Nov
+2023, a period dominated by the post-COVID monetary-tightening
+cycle. Each fold's TRAINING set includes regime-diverse data
+(2018–2020 in particular), but the EVALUATION sets are concentrated
+in one macro regime. We mitigate via:
+  (1) the 2024–2026 hold-out as a genuinely out-of-regime final
+      test, with planned sub-stratification (2024 H1 / 2024 H2 /
+      2025 / 2026 Q1) for regime-transfer analysis;
+  (2) ICIR as primary model-selection criterion, which penalizes
+      models whose IC varies widely across folds.
+
+A more aggressive fold structure (3-month tests, more folds) was
+considered but rejected: shorter test windows produce unstable per-
+fold IC estimates, and the stretch-goal hold-out sub-stratification
+provides regime coverage at lower variance cost.
+
+A historical extension (download data back to 2008–2015) was also
+considered for broader regime coverage. Rejected on two grounds:
+(a) point-in-time index membership data is unavailable, so the
+universe would inherit deeper survivorship bias when reaching back
+into periods like the 2008 crisis where the index-vs-current-tickers
+map drifts substantially; (b) several names in the current universe
+(META, ABBV, KHC, ZTS, HCA, NOW, PYPL) IPO'd after 2010, requiring
+either ragged-history handling or universe substitution that erodes
+the "S&P 100" framing further. Documented as future work for a
+follow-on study with proper point-in-time membership.
+
+
