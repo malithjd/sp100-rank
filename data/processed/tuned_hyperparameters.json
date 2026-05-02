@@ -1,0 +1,17 @@
+{
+  "linear": {
+    "alpha": 10
+  },
+  "rf": {
+    "max_depth": 12,
+    "min_samples_leaf": 50
+  },
+  "xgb": {
+    "max_depth": 4,
+    "learning_rate": 0.1
+  },
+  "lgb": {
+    "num_leaves": 15,
+    "learning_rate": 0.05
+  }
+}

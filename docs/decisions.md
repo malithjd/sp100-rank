@@ -260,3 +260,46 @@ the "S&P 100" framing further. Documented as future work for a
 follow-on study with proper point-in-time membership.
 
 
+---
+
+## ADR-010: Phase 4 walk-forward training results (2026-04-30)
+**Decision**: Random Forest is the lead candidate for downstream
+analysis (SHAP, regime breakdown, portfolio simulation). All four
+models are retained for the comparison table; final model selection
+will be re-confirmed after Phase 5 evaluation.
+
+**Findings**:
+  | Model  | Mean IC | ICIR  |
+  |--------|---------|-------|
+  | Linear | +0.006  | 0.106 |
+  | RF     | +0.022  | 0.579 |
+  | XGB    | +0.013  | 0.457 |
+  | LGB    | +0.015  | 0.432 |
+
+  Computed across 5 walk-forward folds (Feb 2021 - Nov 2023).
+  Tree models substantially outperform the linear baseline,
+  validating the proposal hypothesis that non-linear feature
+  interactions are needed for cross-sectional ranking.
+
+**Reasoning**: 
+- All three tree models produce IC > 2 standard errors above zero;
+  linear baseline is statistically indistinguishable from zero.
+- ICIR comparison ranks RF > XGB > LGB > Linear. RF's superior
+  ICIR (lower IC volatility across folds) is the headline result.
+- Fold-by-fold pattern shows clear regime dependence: every model
+  produces strongest IC in Fold 3 (2022 bear market, when factor
+  models historically work best) and weakest in Fold 5 (mid-2023
+  AI rally, when concentrated mega-cap returns break factor models).
+  This supports the regime-aware analysis planned for Phase 5.
+
+**Trade-offs**: Fold 1 results are slightly optimistic per ADR-004
+(features and hyperparameters were selected on Fold 1 train data).
+The Fold 2-5 average — RF mean IC +0.025, ICIR 0.69 — is the
+unbiased estimate.
+
+**Hyperparameters chosen** (from Fold 1 inner train/val split):
+  - Linear (Ridge): alpha = 10.0
+  - Random Forest:  max_depth = 12, min_samples_leaf = 50
+  - XGBoost:        max_depth = 4, learning_rate = 0.10
+  - LightGBM:       num_leaves = 15, learning_rate = 0.05
+

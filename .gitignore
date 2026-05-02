@@ -30,6 +30,9 @@ data/raw/*
 data/processed/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
+!data/processed/selected_features.json
+!data/processed/tuned_hyperparameters.json
+!data/processed/fold_ic_summary.csv
 
 models/checkpoints/*
 !models/checkpoints/.gitkeep
