@@ -191,3 +191,43 @@ engineering. No further cleaning passes needed.
 (ADR-005), not luck. Hand-curating to known continuously-listed
 large caps avoids the data quirks of less-liquid or recently-IPO'd
 names.
+
+---
+
+## ADR-009: Walk-forward fold configuration (2026-04-30)
+**Decision**: 5 folds with 756-day initial train, 126-day test
+periods, 20-day embargo, expanding train window.
+
+Effective coverage:
+- Fold 1: train 2018-01 → 2020-12, test 2021-02 → 2021-08
+- Fold 2: train 2018-01 → 2021-08, test 2021-08 → 2022-03
+- Fold 3: train 2018-01 → 2022-03, test 2022-03 → 2022-09
+- Fold 4: train 2018-01 → 2022-09, test 2022-10 → 2023-04
+- Fold 5: train 2018-01 → 2023-04, test 2023-05 → 2023-11
+
+Hold-out (unused by walk-forward CV): 2024-01 → 2026-03 (~28 months).
+
+**Reasoning**: 5 folds provide enough samples to compute mean IC and
+ICIR with reasonable confidence; 6-month test periods are long
+enough that per-fold IC isn't overly noisy; 3-year initial train
+gives the model enough history to learn cross-sectional patterns.
+
+The 2024-2026 portion of the data is deliberately unused by walk-
+forward CV. It serves as a BLIND HOLD-OUT for final evaluation —
+the chosen model (selected by walk-forward IC) is evaluated once
+on this held-out period to produce a final unbiased number. This
+is methodologically stronger than reporting only walk-forward IC
+because the hold-out has not been touched at any point during
+model selection or hyperparameter tuning.
+
+**Trade-offs**: We use 60% of available data for walk-forward CV
+and 30% as hold-out, with 10% lost to embargoes between folds and
+between fold 5 and the hold-out start. A more aggressive setup
+(more folds, shorter tests) would use more of the data but at the
+cost of less stable per-fold IC.
+
+**Alternatives considered**:
+  - 4 folds with longer test windows (rejected: fewer samples for ICIR).
+  - Rolling (not expanding) train windows (rejected per ADR-002).
+  - Using all data in walk-forward, no hold-out (rejected: the hold-
+    out is the only unbiased final evaluation we get).
