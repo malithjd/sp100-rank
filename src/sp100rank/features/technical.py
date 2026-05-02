@@ -269,40 +269,171 @@ def mom_12_1(close: pd.Series) -> pd.Series:
     # The momentum is the return from t-252 to t-21.
     return (close_t_minus_21 / close_t_minus_252) - 1.0
 
+def realized_vol(close: pd.Series, window: int = 20) -> pd.Series:
+    """N-day realized volatility — std of daily returns over a window.
+
+    Formula:
+        ret_t = close_t / close_{t-1} - 1
+        rv_t  = std(ret_{t-N+1 ... t})
+
+    Why this is a feature: low-volatility stocks have historically
+    delivered higher RISK-ADJUSTED returns than high-vol stocks (the
+    "low-volatility anomaly," Frazzini & Pedersen 2014, "Betting
+    Against Beta"). Including realized vol lets the model exploit
+    this — it can rank vol differently across stocks.
+
+    We don't annualize. The model doesn't care about units; raw
+    daily-return std works fine and is one less multiplication to
+    track. If you wanted annualized vol, multiply by sqrt(252).
+
+    Causal: pct_change at t uses close[t] and close[t-1]; rolling
+    std at t uses returns from t-N+1 through t.
+    """
+    daily_ret = close.pct_change()
+    return daily_ret.rolling(window=window, min_periods=window).std(ddof=0)
+
+
+def log_dollar_volume(
+    close: pd.Series,
+    volume: pd.Series,
+    window: int = 60,
+) -> pd.Series:
+    """Log of N-day average dollar trading volume.
+
+    Formula: log(mean(close * volume, last N days))
+
+    Why dollar volume not share volume: a $5 stock trading 10M
+    shares ($50M) is much less liquid than a $500 stock trading 1M
+    shares ($500M), even though share volume is 10x higher. Dollar
+    volume normalizes across price levels and is the standard
+    liquidity proxy in cross-sectional studies.
+
+    Why log: dollar volumes span 5+ orders of magnitude across the
+    universe (small caps ~$10M/day, mega caps ~$10B/day). Trees
+    handle this fine without log, but log compresses the range,
+    making the feature numerically well-behaved for the linear
+    baseline model too.
+
+    Causal: rolling mean over t-N+1 through t.
+
+    Reference: Amihud (2002) "Illiquidity and stock returns" —
+    illiquid stocks earn higher returns as compensation for
+    illiquidity risk. Dollar volume is the inverse-illiquidity
+    proxy.
+    """
+    dollar_vol = close * volume
+    avg = dollar_vol.rolling(window=window, min_periods=window).mean()
+    # log1p instead of log to be safe when avg is exactly zero (rare,
+    # but possible on halt days). log1p(x) = log(1+x), behaves
+    # smoothly near zero. Effect on values: negligible (we add 1 to
+    # numbers in the millions, the +1 is rounding error). Effect on
+    # robustness: avoids -inf.
+    return np.log1p(avg)
+
+
+def beta_to_market(
+    close: pd.Series,
+    market_close: pd.Series,
+    window: int = 60,
+) -> pd.Series:
+    """Rolling N-day market beta via OLS slope.
+
+    Formula:
+        ret_t        = close.pct_change()
+        market_ret_t = market_close.pct_change()
+        beta_t       = cov(ret, market_ret) / var(market_ret)
+                       (computed over t-N+1 ... t)
+
+    Beta interpretation: how much the stock moves when the market
+    moves, on average. Beta=1 means moves with the market 1-for-1.
+    Beta=0.5 means defensive (utilities, staples). Beta=1.5 means
+    aggressive (tech, financials). Beta is a structural feature
+    that varies slowly within a stock but differs greatly across
+    the cross-section.
+
+    Why a feature: high-beta stocks earn higher gross returns (CAPM)
+    but lower risk-adjusted returns (the "betting against beta"
+    anomaly). Knowing each stock's beta lets the model rank stocks
+    of different risk profiles appropriately.
+
+    Causal: rolling cov and var at t use only returns through t.
+
+    Important: this function REQUIRES market_close to be provided
+    aligned to the same dates as close (same DatetimeIndex). The
+    caller (`_features_for_one_ticker`) handles that alignment.
+    """
+    stock_ret  = close.pct_change()
+    market_ret = market_close.pct_change()
+
+    # Rolling covariance: cov(stock_ret, market_ret) over the window.
+    # pandas's .rolling().cov() computes pairwise cov when given
+    # another Series.
+    cov = stock_ret.rolling(window=window, min_periods=window).cov(market_ret)
+    var = market_ret.rolling(window=window, min_periods=window).var(ddof=0)
+
+    return cov / var.replace(0, np.nan)
+
+
 
 
 
 def compute_all_features(prices: pd.DataFrame) -> pd.DataFrame:
     """Apply all features per ticker. Returns one row per (date, ticker).
 
-    Currently empty — features are added in subsequent commits, one
-    at a time, each verified by the no-lookahead test.
+    The panel must contain ^GSPC (the market proxy) — beta_to_spx_60
+    requires it. If ^GSPC isn't present, beta will be NaN everywhere
+    but other features still compute correctly.
     """
-    # Sort once at the top so groupby + rolling don't have to think.
     prices = prices.sort_index()
 
-    # Per-ticker feature application. group_keys=False keeps the
-    # output's index aligned with the input's (date, ticker).
+    # Extract market close series, indexed by date only. We pass this
+    # into each ticker's feature computation so beta has access to
+    # the market alongside the stock's own data.
+    #
+    # If ^GSPC isn't in the panel (e.g., synthetic test data), we use
+    # a None placeholder; the per-ticker function handles this case.
+    if "^GSPC" in prices.index.get_level_values("ticker"):
+        market_close = (
+            prices.xs("^GSPC", level="ticker")["adj_close"]
+            .sort_index()
+        )
+    else:
+        market_close = None
+
+    # group_keys=False keeps the output index aligned with input.
+    # We pass market_close as a kwarg to apply, which forwards it to
+    # _features_for_one_ticker. include_groups=False is the pandas
+    # 3.x way to say "don't pass the grouping column inside each
+    # group's frame" (it's already in the index).
     out = (
         prices.groupby(level="ticker", group_keys=False)
-              .apply(_features_for_one_ticker, include_groups=False)
+              .apply(_features_for_one_ticker,
+                     market_close=market_close,
+                     include_groups=False)
     )
     return out
 
 
-def _features_for_one_ticker(df: pd.DataFrame) -> pd.DataFrame:
+def _features_for_one_ticker(
+    df: pd.DataFrame,
+    market_close: pd.Series | None = None,
+) -> pd.DataFrame:
     """Compute features for a single ticker's time series.
 
     Adds one column per feature. The output's index matches the input
     so groupby().apply() reassembles correctly into a panel.
 
+    `market_close` is the broad-market index series (^GSPC) used by
+    beta_to_spx_60. When None (e.g., in tests with no market data),
+    beta is filled with NaN. Other features are unaffected.
+
     All feature functions defined in this module are CAUSAL by
     contract — they use only data through the row's own date.
     Enforced by tests/test_features_no_lookahead.py.
     """
-    close = df["adj_close"]
-    high = df["high"]
-    low = df["low"]
+    close  = df["adj_close"]
+    high   = df["high"]
+    low    = df["low"]
     volume = df["volume"]
 
     out = pd.DataFrame(index=df.index)
@@ -323,6 +454,28 @@ def _features_for_one_ticker(df: pd.DataFrame) -> pd.DataFrame:
     out["mom_12_1"]       = mom_12_1(close)
 
     # === Batch 4 — Risk + liquidity features ===
-    # (will add)
+    out["realized_vol_20"] = realized_vol(close, window=20)
+    out["log_dollar_vol_60"] = log_dollar_volume(close, volume, window=60)
+
+    # Beta requires market data. Align the market series to this
+    # ticker's date index — tickers may have different trading
+    # calendars in edge cases (very old data, foreign halts).
+    # .reindex() with the ticker's date index drops market dates
+    # the ticker doesn't have, fills missing market dates with NaN.
+    if market_close is not None:
+        ticker_dates = df.index.get_level_values("date")
+        market_aligned = market_close.reindex(ticker_dates)
+        # market_aligned now has the same length as df, indexed by
+        # date only (not MultiIndex). We pass it positionally; the
+        # beta function uses .pct_change() and .rolling() which work
+        # on plain Series.
+        out["beta_to_spx_60"] = beta_to_market(
+            close.reset_index(level="ticker", drop=True),
+            market_aligned,
+            window=60,
+        ).values  # .values to align by position, not index.
+    else:
+        # No market data — fill with NaN. Tests use this path.
+        out["beta_to_spx_60"] = np.nan
 
     return out

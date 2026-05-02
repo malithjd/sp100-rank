@@ -56,12 +56,18 @@ def test_features_do_not_depend_on_future(synthetic_panel):
     # input column.
     corrupted = panel.copy()
     future_mask = corrupted.index.get_level_values("date") >= cutoff
-    corrupted.loc[future_mask, "close"]     = -999.0
-    corrupted.loc[future_mask, "adj_close"] = -999.0
-    corrupted.loc[future_mask, "high"]      = -999.0
-    corrupted.loc[future_mask, "low"]       = -999.0
-    corrupted.loc[future_mask, "open"]      = -999.0
-    corrupted.loc[future_mask, "volume"]    = 1
+    # Use POSITIVE garbage values. Negatives + log_dollar_volume produce
+    # RuntimeWarnings that aren't real bugs — the production data
+    # never has negative prices/volumes (cleaning enforces this).
+    # The corruption test still works because the values are still
+    # wildly different from the clean data; if features leak future
+    # data, the change is detected regardless of sign.
+    corrupted.loc[future_mask, "close"]     = 99999.0
+    corrupted.loc[future_mask, "adj_close"] = 99999.0
+    corrupted.loc[future_mask, "high"]      = 99999.0
+    corrupted.loc[future_mask, "low"]       = 99999.0
+    corrupted.loc[future_mask, "open"]      = 99999.0
+    corrupted.loc[future_mask, "volume"]    = 99999999
 
     features_corrupted = compute_all_features(corrupted)
 
