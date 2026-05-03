@@ -25,5 +25,6 @@
   },
   "selection_method": "lightgbm_gain_importance",
   "selection_period_start": "2018-01-02",
-  "selection_period_end": "2020-12-31"
+  "selection_period_end": "2020-12-31",
+  "preprocessing": "none"
 }

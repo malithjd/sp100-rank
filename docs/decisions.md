@@ -389,3 +389,56 @@ training (2008-2015 history with point-in-time membership), explicit
 regime-conditional models, more frequent retraining cadence than
 quarterly.
 
+
+---
+
+## ADR-012: Cross-sectional rank normalization tested and rejected (2026-04-30)
+**Decision**: Cross-sectional rank-normalization of features was
+implemented and tested but REVERTED. The codebase retains the
+transformation function (`cross_sectional_rank_normalize` in
+technical.py) for documentation and future research, but
+`build_features_and_labels` defaults to `cross_sectional=False`.
+
+**Hypothesis tested**: Per-date rank-normalization of features would
+remove regime-level scale variation, letting the model focus on
+relative cross-sectional positioning rather than absolute scale.
+Standard practice in factor model literature.
+
+**Result**: All three tree models regressed substantially. Linear
+showed marginal improvement.
+
+  | Model  | Mean IC (raw) | ICIR (raw) | Mean IC (rank-XS) | ICIR (rank-XS) |
+  |--------|---------------|------------|-------------------|----------------|
+  | Linear | +0.006        | 0.106      | +0.007            | 0.246          |
+  | RF     | +0.022        | 0.579      | +0.004            | 0.090          |
+  | XGB    | +0.013        | 0.457      | -0.001            | -0.024         |
+  | LGB    | +0.015        | 0.432      | +0.003            | 0.082          |
+
+**Reasoning for the regression** (best hypothesis):
+1. Tree models lose absolute-magnitude information that they
+   apparently rely on. A split on raw `mom_60 > 0.15` carries
+   regime-conditional information that becomes ambiguous after
+   rank-normalization (the 80th percentile means different
+   things in different regimes' raw distributions, but trees
+   were already implicitly conditioning on this).
+2. Rank-normalization homogenizes feature distributions, making
+   features more correlated and reducing the cross-feature
+   information the model can exploit.
+
+**What this teaches**: Cross-sectional rank-normalization is a
+useful transformation for linear factor models (where it works
+as expected and ICIR mildly improved) but counter-productive for
+tree models on this kind of factor data. The textbook recommendation
+to always rank-normalize doesn't transfer cleanly to tree-based
+non-linear models.
+
+**Trade-offs**: Linear's modest improvement (ICIR 0.106 → 0.246)
+isn't enough to offset RF's collapse (ICIR 0.579 → 0.090) — the
+overall best-case model is RF on raw features. Reverted.
+
+**Alternatives we did NOT test** (out of scope for course project):
+  - Z-score normalization (might produce different result; outlier-
+    sensitive but preserves more magnitude info than rank).
+  - Hybrid: rank-normalize only the most regime-sensitive features
+    (momentum), keep others raw.
+  - Within-sector rank rather than within-universe.

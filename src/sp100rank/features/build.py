@@ -18,6 +18,7 @@ from sp100rank.features.labels import cross_sectional_rank_label
 def build_features_and_labels(
     start: pd.Timestamp | None = None,
     end:   pd.Timestamp | None = None,
+    cross_sectional: bool = False,
 ) -> tuple[pd.DataFrame, pd.Series]:
     """Compute features + label, optionally sliced to a date window.
 
@@ -34,6 +35,14 @@ def build_features_and_labels(
     """
     panel = load_clean_panel()
     X = compute_all_features(panel)
+
+    # Optional cross-sectional rank normalization. ON by default
+    # (improves IC; rank-stationary across regimes; outlier-robust).
+    # Set to False only for debugging or comparison with raw features.
+    if cross_sectional:
+        from sp100rank.features.technical import cross_sectional_rank_normalize
+        X = cross_sectional_rank_normalize(X)
+
     y = cross_sectional_rank_label(panel)
 
     if start is not None or end is not None:
