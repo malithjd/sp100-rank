@@ -442,3 +442,54 @@ overall best-case model is RF on raw features. Reverted.
   - Hybrid: rank-normalize only the most regime-sensitive features
     (momentum), keep others raw.
   - Within-sector rank rather than within-universe.
+
+---
+
+## ADR-013: Production pipeline design (2026-05-03)
+**Decision**: Split scoring (frequent, weekly) from retraining
+(infrequent, manual / quarterly). Both run as GitHub Actions
+workflows on ubuntu-latest with uv-managed dependencies. Model
+checkpoints are stored as GitHub Release assets, fetched by score
+runs via `gh release download`.
+
+**Reasoning**:
+1. Scoring is cheap and benefits from frequent updates (capture
+   recent market behavior in features). Retraining is expensive
+   and prone to overfitting on noise if done too often.
+2. GitHub Releases are designed for binary artifact distribution.
+   They handle versioning, large file storage (up to 2GB per asset),
+   and download authentication automatically. Better fit than git
+   LFS or committing pickle files to the repo.
+3. The two workflows are decoupled: scoring doesn't need retrain to
+   succeed in a given week (it uses the last successful release);
+   retrain doesn't need scoring to have run (it has its own data
+   refresh). Failure of one doesn't cascade to the other.
+
+**Date handling**: Two distinct constants in config.py:
+   - FROZEN_DATA_END = "2026-03-31" — the snapshot used for all
+     reported development results (Phase 4-5). Never changes.
+   - Production code calls `download_universe()` with `end=None`,
+     which defaults to today. Lets the workflow run on any date
+     without code changes, while preserving reproducibility of
+     reported numbers.
+
+**Trade-offs**: 
+- Scheduled cron is in UTC, not local market time. We chose 14:00
+  UTC to land before US market open. Acceptable because we don't
+  trade on the predictions in real time — the watchlist is for
+  reference.
+- yfinance occasionally rate-limits on cloud IP space. Our retry
+  logic with exponential backoff handles transient cases. If
+  systematic, we'd switch to a paid data feed.
+- 7-day cache staleness tolerance trades freshness for reduced
+  download cost. A workflow run on Monday with cache from previous
+  Friday accepts the cache; same workflow on next Monday rejects it
+  (8 days behind).
+
+**What's still missing**:
+- Email alerts on workflow failure (would add `actions/notify` step).
+- Model performance monitoring in production (would track per-week
+  IC of the previous week's predictions vs realized 20-day returns
+  and alert on degradation).
+- Both are out of scope for the course project; documented as
+  future work.
