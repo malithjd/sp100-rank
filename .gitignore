@@ -44,6 +44,9 @@ models/checkpoints/*
 !models/checkpoints/.gitkeep
 
 # --- Outputs ---
-outputs/
+outputs/*
+!outputs/scores/
+outputs/scores/*
+!outputs/scores/*.csv
 figures/
 *.log

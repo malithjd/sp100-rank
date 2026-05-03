@@ -1,0 +1,54 @@
+# .github/workflows/retrain.yml
+name: Retrain Model
+
+# This is intentionally manual-trigger only by default. If you want
+# quarterly cron (per the proposal's "scoring weekly, retraining
+# quarterly" design), uncomment the schedule line.
+on:
+  workflow_dispatch: {}
+  # schedule:
+  #   - cron: "0 14 1 */3 *"   # 14:00 UTC on the 1st of every 3rd month
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions:
+      # Needed to create a new GitHub Release with the model artifact.
+      contents: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run retrain
+        # Trains on all data through today, saves to models/checkpoints/rf/.
+        run: uv run python -m sp100rank.pipeline.retrain
+
+      - name: Publish checkpoint to GitHub Release
+        # Create a tagged release containing latest.pkl. Tag is
+        # timestamped so each retrain produces a unique release.
+        # The asset is renamed to 'rf_latest.pkl' so score.yml can
+        # always fetch it by a stable name from the latest release.
+        run: |
+          TAG="model-$(date -u +%Y%m%d-%H%M%S)"
+          # Copy with the standard name we'll use in releases.
+          cp models/checkpoints/rf/latest.pkl rf_latest.pkl
+          gh release create "$TAG" \
+            --title "RF checkpoint $(date -u +%Y-%m-%d)" \
+            --notes "Automated retrain. RF model trained on all data through latest yfinance date." \
+            rf_latest.pkl
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

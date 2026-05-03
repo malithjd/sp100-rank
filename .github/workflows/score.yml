@@ -1,0 +1,76 @@
+# .github/workflows/score.yml
+name: Weekly Scoring
+
+# When this runs:
+#   - schedule: every Monday at 14:00 UTC. UTC matters because GitHub
+#     runs cron in UTC always. 14:00 UTC ≈ 9-10 AM Eastern depending
+#     on DST — before US market open so the ranked watchlist is fresh
+#     for the week.
+#   - workflow_dispatch: lets us trigger manually from the Actions tab,
+#     useful for testing and one-off runs.
+on:
+  schedule:
+    - cron: "0 14 * * MON"
+  workflow_dispatch: {}
+
+jobs:
+  score:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    permissions:
+      # Needed for two things: (a) reading our own Releases to fetch
+      # the latest checkpoint, (b) committing scores back to main.
+      contents: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install dependencies
+        # uv sync reads pyproject.toml + uv.lock to install the exact
+        # same package versions we developed against. Reproducibility.
+        run: uv sync
+
+      - name: Download latest model from Releases
+        # Try to fetch the latest checkpoint published by retrain.yml.
+        # If no Release exists yet (first time this workflow runs),
+        # gracefully fall back to the fold5.pkl that committed earlier.
+        # The "|| true" prevents a missing release from failing the job.
+        run: |
+          mkdir -p models/checkpoints/rf
+          gh release download \
+            --pattern 'rf_latest.pkl' \
+            --output models/checkpoints/rf/latest.pkl \
+            2>/dev/null \
+            || echo "No release found yet; will use fallback checkpoint."
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run scoring
+        # The score script handles data download, feature build, and
+        # writing the CSV. It exits 0 on success, 1 on failure.
+        run: uv run python -m sp100rank.pipeline.score
+
+      - name: Commit scores back to repo
+        # Append today's scores file to the main branch. The git diff
+        # check makes this idempotent: if no new file was written
+        # (e.g., score.py already ran today), don't commit.
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add outputs/scores/
+          if git diff --cached --quiet; then
+            echo "No new scores to commit."
+          else
+            git commit -m "chore(scores): weekly run $(date -u +%Y-%m-%d)"
+            git push
+          fi

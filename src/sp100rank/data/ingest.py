@@ -21,7 +21,7 @@ from pathlib import Path
 import pandas as pd
 import yfinance as yf
 
-from sp100rank.config import RAW_DATA_DIR, TRAIN_START, DATA_END
+from sp100rank.config import RAW_DATA_DIR, TRAIN_START, FROZEN_DATA_END
 from sp100rank.data.universe import all_tickers
 
 
@@ -128,7 +128,7 @@ def _normalize(df: pd.DataFrame, ticker: str) -> pd.DataFrame:
 
 def download_universe(
     start: str = TRAIN_START,
-    end: str = DATA_END,
+    end: str | None = None,
     refresh: bool = False,
 ) -> dict[str, str]:
     """Download all tickers, caching one Parquet per ticker.
@@ -149,6 +149,9 @@ def download_universe(
     """
     RAW_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
+    if end is None:
+        end = pd.Timestamp.today().strftime("%Y-%m-%d")
+        print(f"end=None → using today: {end}")
     # yfinance treats `end` as exclusive. Bump by one day so the user
     # provides the last date they want INCLUDED.
     end_exclusive = (pd.Timestamp(end) + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
@@ -161,9 +164,25 @@ def download_universe(
         prefix = f"[{i:>3}/{len(tickers)}] {ticker:<8}"
 
         if path.exists() and not refresh:
-            print(f"{prefix} cached -> {path.name}")
-            statuses[ticker] = "cached"
-            continue
+            # Quick staleness check: if cached file's last date is
+            # within 7 days of today, accept the cache. Otherwise
+            # force a refresh of THIS ticker only.
+            try:
+                cached = pd.read_parquet(path)
+                last_date = cached.index.max()
+                today = pd.Timestamp.today().normalize()
+                days_behind = (today - last_date).days
+                # 7-day tolerance handles weekends + holidays without
+                # forcing weekday-by-weekday re-downloads.
+                if days_behind <= 7:
+                    print(f"{prefix} cached ({last_date.date()}) -> {path.name}")
+                    statuses[ticker] = "cached"
+                    continue
+                else:
+                    print(f"{prefix} cache stale ({days_behind} days behind), refetching...")
+            except Exception:
+                # Corrupt cache → just redownload.
+                print(f"{prefix} cache unreadable, refetching...")
 
         try:
             print(f"{prefix} downloading...", end=" ", flush=True)
