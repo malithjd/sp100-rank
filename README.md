@@ -27,9 +27,17 @@ A mean IC of 0.022 is modest in absolute terms — real-world ICs from professio
 
 ---
 
-## Hold-out evaluation (year-by-year)
+## Data span and how it's used
+
+8 years 4 months of OHLCV data, partitioned as:
 
 ![Walk-forward CV](images/03_walk_forward_cv.png)
+
+The walk-forward CV gives 5 independent (train, test) pairs to evaluate model selection. The hold-out gives one final unbiased number that no decision touched. Production scoring uses the most recently retrained model checkpoint.
+
+---
+
+## Hold-out evaluation (year-by-year)
 
 The hold-out set 2024-01-01 → 2026-03-31 was never touched during walk-forward CV, hyperparameter tuning, or feature selection. The Random Forest model was trained on all data through end-of-2023 and evaluated on this hold-out:
 
@@ -46,47 +54,13 @@ This honest hold-out result is more informative than the in-sample walk-forward 
 
 ---
 
-## What this project does
+## What this project does (aka Simple Architecture)
 
 ![Architecture](images/04_system_architecture.png)
 
 Predicts which of 100 large-cap US stocks will outperform their peers over the next 20 trading days. The model produces a percentile rank per stock per date — values in [0, 1] where 0.95 means "expected to be in the top 5% of performers." A weekly watchlist tags the top 20% as BUY, bottom 20% as AVOID, middle 60% as HOLD.
 
 The model isn't designed to predict market direction. It's designed to *rank* — to tell you which stocks to favor *relative to each other*, regardless of whether the market is going up or down.
-
----
-
-## Data span and how it's used
-
-8 years 4 months of OHLCV data, partitioned as:
-
-```
-2018-01-02 ──────────────────────────────────────────────── 2026-04
-   │                                                              │
-   ├── Walk-forward training pool ──────┐                         │
-   │   (data each fold can train on)    │                         │
-   │                                    │                         │
-   ├──── Fold 1 train ────────────┐ embargo ┌── Fold 1 test ──┐  │
-   │                              │  20d    │ 2021-02→2021-08 │  │
-   │                              └─────────┴─────────────────┘  │
-   │                                                              │
-   ├──── Fold 2 train ────────────────┐ embargo ┌── Fold 2 test ──┐
-   │                                  │  20d    │ 2021-08→2022-03 │
-   │                                  └─────────┴─────────────────┘
-   │                                                              │
-   ├──── Fold 3, 4, 5 (continuing pattern, expanding) ────────────┤
-   │                              ... last test ends 2023-11      │
-   │                                                              │
-   ├──── HOLD-OUT (untouched) ───────────────────────────────────►│
-   │     2024-01-01 → 2026-03-31                                  │
-   │     Used ONCE for unbiased final evaluation.                 │
-   │                                                              │
-   └──── PRODUCTION (live) ──────────────────────────────────────►
-         2026-04 onwards: weekly scoring CSVs in outputs/scores/
-         Quarterly retrains pull this period into training data.
-```
-
-The walk-forward CV gives 5 independent (train, test) pairs to evaluate model selection. The hold-out gives one final unbiased number that no decision touched. Production scoring uses the most recently retrained model checkpoint.
 
 ---
 
@@ -233,22 +207,3 @@ The methodology draws on canonical and recent work:
 - **Practical context**: [Realized information coefficients are small in magnitude and volatile across time (arXiv 2010.08601)](https://arxiv.org/abs/2010.08601) — useful for calibrating expectations on what IC values are achievable.
 
 Full bibliography in `docs/decisions.md`.
-
----
-
-## License
-
-This project is licensed under the [Polyform Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/).
-
-You may use, copy, and modify the code for **noncommercial purposes** including:
-- Academic research, learning, and personal projects
-- Forking and modifying for portfolio demonstration
-
-You may **not** use the code for commercial purposes including:
-- Generating trading signals for paid funds, separately managed accounts, or any compensated investment advisory service
-- Incorporation into commercial software products
-- Training derivatives sold for profit
-
-For commercial licensing, contact via [LinkedIn](https://www.linkedin.com/in/malithjayad/).
-
-The full license text is in [LICENSE](LICENSE).
