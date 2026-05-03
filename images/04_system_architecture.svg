@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 780" width="1100" height="780">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Indie+Flower&amp;display=swap');
+      text { font-family: 'Indie Flower', cursive; }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#000"/>
+    </marker>
+  </defs>
+
+  <rect width="1100" height="780" fill="#ffffff"/>
+
+  <!-- Title -->
+  <text x="550" y="42" text-anchor="middle" font-size="32" fill="#000">How sp100-rank works</text>
+  <text x="550" y="70" text-anchor="middle" font-size="15" fill="#888">data flow from yfinance to weekly production watchlist</text>
+
+  <!-- ============= LAYER 1: Source ============= -->
+  <rect x="475" y="100" width="150" height="44" fill="#fff" stroke="#000" stroke-width="1.5"/>
+  <text x="550" y="130" text-anchor="middle" font-size="18" fill="#000">yfinance API</text>
+
+  <line x1="550" y1="144" x2="550" y2="170" stroke="#000" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ============= LAYER 2: Data ============= -->
+  <rect x="345" y="178" width="180" height="50" fill="#fff" stroke="#000" stroke-width="1"/>
+  <text x="435" y="203" text-anchor="middle" font-size="16" fill="#000">data ingest</text>
+  <text x="435" y="220" text-anchor="middle" font-size="11" fill="#888">101 tickers · per-ticker parquet</text>
+
+  <rect x="575" y="178" width="180" height="50" fill="#fff" stroke="#000" stroke-width="1"/>
+  <text x="665" y="203" text-anchor="middle" font-size="16" fill="#000">clean panel</text>
+  <text x="665" y="220" text-anchor="middle" font-size="11" fill="#888">211k rows · zero anomalies</text>
+
+  <line x1="525" y1="203" x2="575" y2="203" stroke="#000" marker-end="url(#arrow)"/>
+
+  <line x1="550" y1="228" x2="550" y2="255" stroke="#000" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ============= LAYER 3: Features ============= -->
+  <rect x="245" y="263" width="200" height="50" fill="#fff" stroke="#000" stroke-width="1"/>
+  <text x="345" y="288" text-anchor="middle" font-size="16" fill="#000">12 candidate features</text>
+  <text x="345" y="305" text-anchor="middle" font-size="11" fill="#888">momentum · volume · vol · beta</text>
+
+  <rect x="655" y="263" width="200" height="50" fill="#fff" stroke="#000" stroke-width="1.5"/>
+  <text x="755" y="288" text-anchor="middle" font-size="16" fill="#000">selected: top 8</text>
+  <text x="755" y="305" text-anchor="middle" font-size="11" fill="#888">LightGBM gain · Fold 1 only</text>
+
+  <line x1="445" y1="288" x2="655" y2="288" stroke="#000" marker-end="url(#arrow)"/>
+  <text x="550" y="282" text-anchor="middle" font-size="11" fill="#888">filter</text>
+
+  <line x1="755" y1="313" x2="755" y2="335" stroke="#000" stroke-width="1.5"/>
+  <line x1="755" y1="335" x2="550" y2="335" stroke="#000" stroke-width="1.5"/>
+  <line x1="550" y1="335" x2="550" y2="355" stroke="#000" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ============= LAYER 4: Walk-forward CV ============= -->
+  <rect x="380" y="363" width="340" height="50" fill="#fff" stroke="#000" stroke-width="1.5"/>
+  <text x="550" y="388" text-anchor="middle" font-size="18" fill="#000">walk-forward CV (5 expanding folds)</text>
+  <text x="550" y="405" text-anchor="middle" font-size="11" fill="#888">20-day embargo · ICIR-ranked · 2021–2023</text>
+
+  <line x1="550" y1="413" x2="550" y2="440" stroke="#000" stroke-width="1.5"/>
+
+  <!-- ============= LAYER 5: 4 Models ============= -->
+  <line x1="200" y1="440" x2="900" y2="440" stroke="#000" stroke-width="1"/>
+  <line x1="200" y1="440" x2="200" y2="455" stroke="#000" stroke-width="1"/>
+  <line x1="430" y1="440" x2="430" y2="455" stroke="#000" stroke-width="1"/>
+  <line x1="670" y1="440" x2="670" y2="455" stroke="#000" stroke-width="1"/>
+  <line x1="900" y1="440" x2="900" y2="455" stroke="#000" stroke-width="1"/>
+
+  <!-- Model boxes -->
+  <rect x="140" y="460" width="120" height="55" fill="#fff" stroke="#dc2626" stroke-width="1.5"/>
+  <text x="200" y="483" text-anchor="middle" font-size="16" fill="#000">Linear</text>
+  <text x="200" y="503" text-anchor="middle" font-size="11" fill="#888">Ridge · IC +0.006</text>
+
+  <rect x="370" y="455" width="120" height="65" fill="#fff" stroke="#2563eb" stroke-width="2.5"/>
+  <text x="430" y="478" text-anchor="middle" font-size="15" fill="#2563eb">Random Forest</text>
+  <text x="430" y="495" text-anchor="middle" font-size="14" fill="#2563eb">★ leader ★</text>
+  <text x="430" y="513" text-anchor="middle" font-size="11" fill="#2563eb">IC +0.022 · ICIR 0.58</text>
+
+  <rect x="610" y="460" width="120" height="55" fill="#fff" stroke="#000" stroke-width="1"/>
+  <text x="670" y="483" text-anchor="middle" font-size="16" fill="#000">XGBoost</text>
+  <text x="670" y="503" text-anchor="middle" font-size="11" fill="#888">IC +0.013</text>
+
+  <rect x="840" y="460" width="120" height="55" fill="#fff" stroke="#000" stroke-width="1"/>
+  <text x="900" y="483" text-anchor="middle" font-size="16" fill="#000">LightGBM</text>
+  <text x="900" y="503" text-anchor="middle" font-size="11" fill="#888">IC +0.015</text>
+
+  <!-- Arrows from models to evaluation (converging back to RF as the chosen) -->
+  <line x1="430" y1="520" x2="430" y2="555" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="445" y="545" font-size="11" fill="#2563eb">selected</text>
+
+  <!-- ============= LAYER 6: Evaluation ============= -->
+  <rect x="180" y="563" width="500" height="60" fill="#fff" stroke="#000" stroke-width="1"/>
+  <text x="430" y="588" text-anchor="middle" font-size="16" fill="#000">Evaluation suite (RF model)</text>
+
+  <line x1="220" y1="600" x2="640" y2="600" stroke="#aaa" stroke-width="0.5"/>
+
+  <text x="245" y="615" text-anchor="middle" font-size="11" fill="#444">per-fold IC</text>
+  <text x="335" y="615" text-anchor="middle" font-size="11" fill="#444">SHAP stability</text>
+  <text x="430" y="615" text-anchor="middle" font-size="11" fill="#444">decile portfolio</text>
+  <text x="535" y="615" text-anchor="middle" font-size="11" fill="#444">regime breakdown</text>
+  <text x="615" y="615" text-anchor="middle" font-size="11" fill="#444">hold-out 24–26</text>
+
+  <!-- Hold-out callout -->
+  <rect x="720" y="563" width="200" height="60" fill="#fff" stroke="#2563eb" stroke-width="1.5"/>
+  <text x="820" y="588" text-anchor="middle" font-size="14" fill="#2563eb">Hold-out 2024–2026</text>
+  <text x="820" y="605" text-anchor="middle" font-size="11" fill="#888">untouched · 542 days</text>
+  <text x="820" y="618" text-anchor="middle" font-size="11" fill="#888">final unbiased number</text>
+
+  <line x1="430" y1="623" x2="430" y2="660" stroke="#000" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ============= LAYER 7: Production ============= -->
+  <rect x="190" y="668" width="480" height="65" fill="#fff" stroke="#000" stroke-width="1.5"/>
+  <text x="430" y="693" text-anchor="middle" font-size="18" fill="#000">Production pipeline · GitHub Actions</text>
+
+  <line x1="240" y1="705" x2="620" y2="705" stroke="#aaa" stroke-width="0.5"/>
+
+  <text x="285" y="722" text-anchor="middle" font-size="13" fill="#444">score.yml (weekly)</text>
+  <text x="430" y="722" text-anchor="middle" font-size="13" fill="#444">retrain.yml (manual)</text>
+  <text x="585" y="722" text-anchor="middle" font-size="13" fill="#444">GitHub Releases</text>
+
+  <!-- Footer caption -->
+  <text x="550" y="763" text-anchor="middle" font-size="11" fill="#aaa">11 tests · 13 ADRs · everything reproducible from pyproject.toml</text>
+</svg>

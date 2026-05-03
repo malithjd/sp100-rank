@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 500" width="1100" height="500">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Indie+Flower&amp;display=swap');
+      text { font-family: 'Indie Flower', cursive; }
+    </style>
+    <pattern id="hatch" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+      <line x1="0" y1="0" x2="0" y2="6" stroke="#666" stroke-width="2"/>
+    </pattern>
+  </defs>
+
+  <rect width="1100" height="500" fill="#ffffff"/>
+
+  <!-- Title -->
+  <text x="550" y="40" text-anchor="middle" font-size="30" fill="#000">Walk-Forward Cross-Validation</text>
+  <text x="550" y="65" text-anchor="middle" font-size="14" fill="#888">5 expanding-window folds · 20-day embargo · held-out 2024–2026 untouched</text>
+
+  <!-- Time axis at top -->
+  <line x1="100" y1="105" x2="1090" y2="105" stroke="#000" stroke-width="1"/>
+
+  <!-- Year tick marks (each year = 112px after x=100, accounting for 8.25 years to 2026-04) -->
+  <g font-size="12" fill="#444">
+    <line x1="100" y1="100" x2="100" y2="110" stroke="#000"/>
+    <text x="100" y="92" text-anchor="middle">2018</text>
+
+    <line x1="220" y1="100" x2="220" y2="110" stroke="#000"/>
+    <text x="220" y="92" text-anchor="middle">2019</text>
+
+    <line x1="340" y1="100" x2="340" y2="110" stroke="#000"/>
+    <text x="340" y="92" text-anchor="middle">2020</text>
+
+    <line x1="460" y1="100" x2="460" y2="110" stroke="#000"/>
+    <text x="460" y="92" text-anchor="middle">2021</text>
+
+    <line x1="580" y1="100" x2="580" y2="110" stroke="#000"/>
+    <text x="580" y="92" text-anchor="middle">2022</text>
+
+    <line x1="700" y1="100" x2="700" y2="110" stroke="#000"/>
+    <text x="700" y="92" text-anchor="middle">2023</text>
+
+    <line x1="820" y1="100" x2="820" y2="110" stroke="#000"/>
+    <text x="820" y="92" text-anchor="middle">2024</text>
+
+    <line x1="940" y1="100" x2="940" y2="110" stroke="#000"/>
+    <text x="940" y="92" text-anchor="middle">2025</text>
+
+    <line x1="1060" y1="100" x2="1060" y2="110" stroke="#000"/>
+    <text x="1060" y="92" text-anchor="middle">2026</text>
+  </g>
+
+  <!-- ============================================ -->
+  <!-- Fold rows. Each row 28px tall, gap 10px -->
+  <!-- ============================================ -->
+
+  <!-- FOLD 1: train Jan 2018–Dec 2020, embargo, test Feb–Aug 2021 -->
+  <text x="85" y="142" text-anchor="end" font-size="14" fill="#000">Fold 1</text>
+  <rect x="100" y="125" width="350" height="28" fill="#dddddd"/>
+  <rect x="450" y="125" width="14" height="28" fill="url(#hatch)"/>
+  <rect x="464" y="125" width="60" height="28" fill="#dc2626"/>
+
+  <!-- FOLD 2 -->
+  <text x="85" y="180" text-anchor="end" font-size="14" fill="#000">Fold 2</text>
+  <rect x="100" y="163" width="424" height="28" fill="#dddddd"/>
+  <rect x="524" y="163" width="14" height="28" fill="url(#hatch)"/>
+  <rect x="538" y="163" width="60" height="28" fill="#dc2626"/>
+
+  <!-- FOLD 3 -->
+  <text x="85" y="218" text-anchor="end" font-size="14" fill="#000">Fold 3</text>
+  <rect x="100" y="201" width="498" height="28" fill="#dddddd"/>
+  <rect x="598" y="201" width="14" height="28" fill="url(#hatch)"/>
+  <rect x="612" y="201" width="60" height="28" fill="#dc2626"/>
+
+  <!-- FOLD 4 -->
+  <text x="85" y="256" text-anchor="end" font-size="14" fill="#000">Fold 4</text>
+  <rect x="100" y="239" width="572" height="28" fill="#dddddd"/>
+  <rect x="672" y="239" width="14" height="28" fill="url(#hatch)"/>
+  <rect x="686" y="239" width="60" height="28" fill="#dc2626"/>
+
+  <!-- FOLD 5 -->
+  <text x="85" y="294" text-anchor="end" font-size="14" fill="#000">Fold 5</text>
+  <rect x="100" y="277" width="646" height="28" fill="#dddddd"/>
+  <rect x="746" y="277" width="14" height="28" fill="url(#hatch)"/>
+  <rect x="760" y="277" width="60" height="28" fill="#dc2626"/>
+
+  <!-- HOLD-OUT (special row, 2024-01 to 2026-03) -->
+  <text x="85" y="332" text-anchor="end" font-size="14" fill="#2563eb">Hold-out</text>
+  <rect x="820" y="315" width="240" height="28" fill="#2563eb" fill-opacity="0.85"/>
+
+  <!-- PRODUCTION (April 2026+) -->
+  <text x="85" y="370" text-anchor="end" font-size="14" fill="#000">Production</text>
+  <rect x="1060" y="353" width="30" height="28" fill="#000" fill-opacity="0.7"/>
+  <text x="1095" y="372" font-size="12" fill="#444">→ live</text>
+
+  <!-- Annotation lines connecting hold-out to text -->
+  <text x="940" y="362" text-anchor="middle" font-size="11" fill="#2563eb">2024-01 → 2026-03 · 542 days · final unbiased eval</text>
+
+  <!-- Brief annotation on fold structure -->
+  <text x="320" y="395" text-anchor="middle" font-size="11" fill="#888">expanding train pool · earlier folds use less data</text>
+  <line x1="100" y1="380" x2="100" y2="385" stroke="#888" stroke-width="0.5"/>
+  <line x1="746" y1="380" x2="746" y2="385" stroke="#888" stroke-width="0.5"/>
+  <line x1="100" y1="383" x2="746" y2="383" stroke="#888" stroke-width="0.5"/>
+
+  <!-- Legend at bottom -->
+  <g transform="translate(180, 430)">
+    <rect x="0" y="0" width="22" height="14" fill="#dddddd"/>
+    <text x="28" y="12" font-size="13" fill="#000">train (expanding)</text>
+
+    <rect x="200" y="0" width="22" height="14" fill="url(#hatch)"/>
+    <text x="228" y="12" font-size="13" fill="#000">20-day embargo</text>
+
+    <rect x="380" y="0" width="22" height="14" fill="#dc2626"/>
+    <text x="408" y="12" font-size="13" fill="#000">CV test (~6 months)</text>
+
+    <rect x="565" y="0" width="22" height="14" fill="#2563eb"/>
+    <text x="593" y="12" font-size="13" fill="#000">held-out (untouched)</text>
+
+    <rect x="730" y="0" width="22" height="14" fill="#000" fill-opacity="0.7"/>
+    <text x="758" y="12" font-size="13" fill="#000">production</text>
+  </g>
+
+  <text x="550" y="475" text-anchor="middle" font-size="12" fill="#aaa">embargo prevents label leakage: a label at train_end uses prices through train_end+20</text>
+</svg>

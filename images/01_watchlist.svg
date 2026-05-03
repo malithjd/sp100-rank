@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600" width="900" height="600">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Indie+Flower&amp;display=swap');
+      text { font-family: 'Indie Flower', cursive; }
+    </style>
+  </defs>
+
+  <rect width="900" height="600" fill="#ffffff"/>
+
+  <text x="50" y="35" font-size="14" fill="#888">sp100-rank · weekly watchlist</text>
+  <text x="850" y="35" text-anchor="end" font-size="14" fill="#888">May 1, 2026</text>
+
+  <text x="450" y="85" text-anchor="middle" font-size="46" fill="#000">Today's Watchlist</text>
+  <text x="450" y="115" text-anchor="middle" font-size="18" fill="#666">forecast for the next 20 trading days</text>
+
+  <line x1="450" y1="160" x2="450" y2="540" stroke="#000" stroke-width="0.7"/>
+
+  <!-- BUY column -->
+  <text x="225" y="205" text-anchor="middle" font-size="56" fill="#2563eb">BUY</text>
+  <text x="225" y="232" text-anchor="middle" font-size="13" fill="#888">top decile · expected to outperform peers</text>
+
+  <text x="105" y="295" font-size="36" fill="#000">NFLX</text>
+  <text x="395" y="295" text-anchor="end" font-size="22" fill="#888">0.62</text>
+  <line x1="105" y1="305" x2="395" y2="305" stroke="#e5e5e5" stroke-width="0.5"/>
+
+  <text x="105" y="345" font-size="36" fill="#000">NOW</text>
+  <text x="395" y="345" text-anchor="end" font-size="22" fill="#888">0.62</text>
+  <line x1="105" y1="355" x2="395" y2="355" stroke="#e5e5e5" stroke-width="0.5"/>
+
+  <text x="105" y="395" font-size="36" fill="#000">ORCL</text>
+  <text x="395" y="395" text-anchor="end" font-size="22" fill="#888">0.61</text>
+  <line x1="105" y1="405" x2="395" y2="405" stroke="#e5e5e5" stroke-width="0.5"/>
+
+  <text x="105" y="445" font-size="36" fill="#000">INTC</text>
+  <text x="395" y="445" text-anchor="end" font-size="22" fill="#888">0.60</text>
+  <line x1="105" y1="455" x2="395" y2="455" stroke="#e5e5e5" stroke-width="0.5"/>
+
+  <text x="105" y="495" font-size="36" fill="#000">SYK</text>
+  <text x="395" y="495" text-anchor="end" font-size="22" fill="#888">0.58</text>
+
+  <!-- AVOID column -->
+  <text x="675" y="205" text-anchor="middle" font-size="56" fill="#dc2626">AVOID</text>
+  <text x="675" y="232" text-anchor="middle" font-size="13" fill="#888">bottom decile · expected to underperform peers</text>
+
+  <text x="505" y="295" font-size="36" fill="#000">AMZN</text>
+  <text x="845" y="295" text-anchor="end" font-size="22" fill="#888">0.48</text>
+  <line x1="505" y1="305" x2="845" y2="305" stroke="#e5e5e5" stroke-width="0.5"/>
+
+  <text x="505" y="345" font-size="36" fill="#000">FDX</text>
+  <text x="845" y="345" text-anchor="end" font-size="22" fill="#888">0.48</text>
+  <line x1="505" y1="355" x2="845" y2="355" stroke="#e5e5e5" stroke-width="0.5"/>
+
+  <text x="505" y="395" font-size="36" fill="#000">TJX</text>
+  <text x="845" y="395" text-anchor="end" font-size="22" fill="#888">0.47</text>
+  <line x1="505" y1="405" x2="845" y2="405" stroke="#e5e5e5" stroke-width="0.5"/>
+
+  <text x="505" y="445" font-size="36" fill="#000">MCD</text>
+  <text x="845" y="445" text-anchor="end" font-size="22" fill="#888">0.47</text>
+  <line x1="505" y1="455" x2="845" y2="455" stroke="#e5e5e5" stroke-width="0.5"/>
+
+  <text x="505" y="495" font-size="36" fill="#000">SPGI</text>
+  <text x="845" y="495" text-anchor="end" font-size="22" fill="#888">0.47</text>
+
+  <text x="450" y="575" text-anchor="middle" font-size="13" fill="#aaa">predicted percentile rank vs S&amp;P 100 peers · not financial advice</text>
+</svg>
