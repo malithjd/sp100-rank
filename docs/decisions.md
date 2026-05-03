@@ -1,495 +1,209 @@
-# Architecture Decision Records
+# sp100-rank
 
-This file logs significant decisions made during the project, in
-chronological order. Each entry has the same structure:
+Cross-sectional return ranking for 100 large-cap U.S. equities. — by [Malith J. Don](https://www.linkedin.com/in/malithjayad/), 2026.
 
-  ## ADR-NNN: Title (YYYY-MM-DD)
-  **Decision**: What we decided.
-  **Reasoning**: Why.
-  **Trade-offs**: What we gave up.
-  **Alternatives considered**: What else we looked at.
+![Today's Watchlist](images/01_watchlist.png)
 
-Add to this file every time you make a choice that future-you would
-reasonably want to know about. The writeup will draw heavily from here.
+The system trains gradient-boosted models on technical features, evaluates them via walk-forward cross-validation across 5 folds, and exposes the lead model behind an automated GitHub Actions pipeline that retrains on demand and scores the universe weekly.
 
 ---
 
-## ADR-001: Real Python package vs. Colab notebook (2026-04-30)
-**Decision**: Build as a `src/`-layout Python package from day one.
-Notebooks reserved for EDA only.
+## Headline result
 
-**Reasoning**: Task 5 (GitHub Actions automation) requires `.py`
-modules invokable from a YAML workflow. Notebooks don't schedule or
-diff cleanly. Starting in Colab and migrating later is a known source
-of bugs at the worst possible time (week-of-deadline).
+Walk-forward CV across 5 folds, Feb 2021 – Nov 2023:
 
-**Trade-offs**: Slightly slower iteration speed for one-off exploration
-(though VS Code's native Jupyter kernel mitigates this).
+![Per-fold IC](images/02_per_fold_ic.png)
 
-**Alternatives considered**: Colab-first then port; flat-layout package
-without `src/`. Rejected the latter because flat layouts allow
-accidental imports from CWD that pass locally and break in CI.
+| Model        | Mean IC | ICIR  | Best fold | Worst fold |
+|--------------|---------|-------|-----------|------------|
+| Linear       | +0.006  | 0.11  | +0.087    | -0.058     |
+| **Random Forest** | **+0.022**  | **0.58**  | +0.073    | -0.021     |
+| XGBoost      | +0.013  | 0.46  | +0.048    | -0.022     |
+| LightGBM     | +0.015  | 0.43  | +0.057    | -0.034     |
 
----
+Tree models substantially outperform the linear baseline. Random Forest leads on ICIR — both the highest mean IC and the most stable across folds.
 
-## ADR-002: Walk-forward CV over CPCV (2026-04-30)
-**Decision**: Walk-forward cross-validation with 20-day embargo as the
-primary evaluation scheme. Combinatorial Purged CV (CPCV) reserved as
-optional robustness check if buffer time permits.
-
-**Reasoning**: (1) Walk-forward mirrors the deployment pipeline (Task
-5), where the model is scored against a strictly forward-evolving data
-feed. (2) Proposal scope commits to walk-forward.
-
-**Trade-offs**: Arian, Norouzi & Seco (2024, Knowledge-Based Systems)
-demonstrate CPCV produces lower Probability of Backtest Overfitting
-than walk-forward on synthetic SPX data; we accept the higher PBO risk
-in exchange for pipeline alignment, and acknowledge it explicitly.
-
-**Alternatives considered**: CPCV (kept as stretch goal); standard
-k-fold (rejected — leaks future into past); single train/test split
-(rejected — no fold variance, no ICIR estimate).
+A mean IC of 0.022 is modest in absolute terms — real-world ICs from professional stock selection models are [generally small in magnitude and volatile across time](https://arxiv.org/abs/2010.08601). Grinold (referenced in [MSCI Barra's IC documentation](https://app2.msci.com/products/analytics/aegis/PI_Converting_Scores_Into_Alphas.pdf)) characterizes IC = 0.05 as "good" and IC = 0.10 as "very good," but realized ICs in practice are often smaller. For comparison, [top-quartile equity managers achieve annualized information ratios of around 0.5](https://en.wikipedia.org/wiki/Information_ratio); our cross-sectional ICIR of 0.58 (annualized 2.05 via Grinold's fundamental law) is a *prediction signal* metric, not a portfolio implementation metric — the decile portfolio simulation below gives the realistic Sharpe.
 
 ---
 
-## ADR-003: Realistic execution alignment (2026-04-30)
-**Decision**: Features at date `t` use OHLCV through close of `t`.
-Label at date `t` is the return from close of `t+1` to close of `t+21`
-(20 trading days held). Implements a 1-day execution lag.
+## Data span and how it's used
 
-**Reasoning**: The naive same-bar setup uses `close_{t+h}/close_t`,
-which implicitly trades AT today's close using TODAY's close as a
-feature — same-bar leakage. Inflates IC by ~0.01–0.02 silently.
+8 years 4 months of OHLCV data, partitioned as:
 
-**Trade-offs**: Removes ~1 day of theoretical edge per holding period
-versus the same-bar baseline. Honest IC numbers in exchange.
+![Walk-forward CV](images/03_walk_forward_cv.png)
 
-**Alternatives considered**: Same-bar trading (rejected — leakage);
-open-to-open trading (rejected — yfinance opens are unreliable for
-some illiquid names; close-to-close is cleaner).
+The walk-forward CV gives 5 independent (train, test) pairs to evaluate model selection. The hold-out gives one final unbiased number that no decision touched. Production scoring uses the most recently retrained model checkpoint.
 
 ---
 
-## ADR-004: Feature pre-selection via gain importance on Fold 1 train (2026-04-30)
-**Decision**: Compute 12 candidate features. Fit a single LightGBM on
-Fold 1 training data only, rank by gain importance, retain the top 8.
-Use this fixed feature set across all 4 models and all 5 folds.
+## Hold-out evaluation (year-by-year)
 
-**Reasoning**: 12 → 8 is a meaningful selection step (~33% drop) that
-prevents the curse of dimensionality without being so aggressive as to
-discard signal. Selection on Fold 1 train data only — no information
-leak from later folds. Gain importance is faster and less overfit-prone
-than SHAP for selection (we use SHAP for INTERPRETATION later).
+The hold-out set 2024-01-01 → 2026-03-31 was never touched during walk-forward CV, hyperparameter tuning, or feature selection. The Random Forest model was trained on all data through end-of-2023 and evaluated on this hold-out:
 
-**Trade-offs**: Fold 1 IC is slightly optimistic (the features were
-chosen using its training data). Fold 2–5 IC is unbiased. We report
-Fold 1 in the table and note this caveat.
+| Period       | Days | Mean IC  | What was happening |
+|--------------|------|----------|--------------------|
+| 2024 full    | 252  | **-0.021** | Post-COVID concentration unwinds slowly; mega-cap dominance still suppresses cross-sectional dispersion |
+| 2025 full    | 250  | **+0.017** | Cross-section re-broadens; factor signals partially recover |
+| 2026 Q1      | 40   | **+0.136** | Strong recovery (small sample, ±0.05 std error) |
+| **Combined** | **542** | **+0.008** | t-stat 1.24 (p ≈ 0.21) |
 
-**Alternatives considered**: All 12 features (rejected — adds noise,
-hurts SHAP interpretability); Lasso for feature selection (rejected
-— linear method, biased against the nonlinear interactions GBMs
-exploit); held-out 2018 sample for selection (rejected — eats too
-much early data given our small training history).
+The combined hold-out cannot statistically reject H0: alpha = 0. This is the unbiased final estimate. The 2024 negative IC is the project's most important finding — it demonstrates the regime-transfer cost of training on 2018–2023 data, exactly the kind of effect that walk-forward CV alone underestimates.
+
+What looks like "the AI rally breaking the model" in 2023 is actually the visible tip of a four-year structural narrowing of the S&P 100 cross-section. COVID accelerated digital adoption asymmetrically toward mega-caps from 2020 onward; zero rates revalued long-duration growth upward through 2021; the 2022 rate cycle filtered out weak growth stocks but spared the dominant cash-flow machines; the AI narrative in 2023 then layered onto an already-concentrated cross-section. Factor models work best when the universe has healthy dispersion. They struggle when 7 names drive most of the index return. The 2025 recovery to +0.017 is consistent with this concentration partially unwinding as the cross-section re-broadens.
+
+This honest hold-out result is more informative than the in-sample walk-forward IC. Methodology mature enough to surface the regime-transfer problem instead of glossing it.
 
 ---
 
-## ADR-005: Universe construction (2026-04-30)
-**Decision**: Fixed hand-curated universe of 100 large-cap U.S.
-equities, plus the ^GSPC index as a market proxy for the
-beta_to_spx_60 feature (excluded from the prediction cross-section).
+## What this project does (aka Simple Architecture)
 
-The 100 names are large-cap, liquid stocks broadly drawn from the
-S&P 100 / S&P 500 top-tier, but the list is NOT identical to the
-index-defined S&P 100 at any specific date. Throughout the report
-we refer to it as "100 large-cap U.S. equities," not S&P 100.
-For data infrastructure purposes the panel contains 101 tickers (100 equities + ^GSPC), 
-but the prediction universe — the set of names the model ranks against each other — is 
-the 100 equities only.
+![Architecture](images/04_system_architecture.png)
 
-**Reasoning**: Index-membership reconstruction at point-in-time is
-out of scope for the time budget. A hand-curated stable universe
-spanning 2018-2026 (a) avoids the survivorship bias inherent to
-"current S&P 100 backtested historically," (b) ensures all names
-have full 2018-2026 history available from yfinance, (c) sidesteps
-ticker-rename quirks (e.g., FISV → FI in 2023).
+Predicts which of 100 large-cap US stocks will outperform their peers over the next 20 trading days. The model produces a percentile rank per stock per date — values in [0, 1] where 0.95 means "expected to be in the top 5% of performers." A weekly watchlist tags the top 20% as BUY, bottom 20% as AVOID, middle 60% as HOLD.
 
-The universe was built by starting from a candidate list of 104
-large-caps and dropping four:
-  - FISV (renamed to FI in 2023; complicates split history)
-  - GOOG (kept GOOGL — same entity, redundant cross-sectional weight)
-  - EL   (extreme idiosyncratic drawdown 2022-2024 distorts tails)
-  - PSA  (REIT with atypical total-return profile)
-
-**Trade-offs**: The universe is hand-picked and not reproducible
-from a public index definition. We document the construction
-explicitly and list every ticker in src/sp100rank/data/universe.py
-to compensate. Hand-picking introduces selection effects (we know
-these names had complete history) but does not introduce forward-
-looking bias, since membership was decided based on company
-identity, not on past returns.
-
-**Alternatives considered**: 
-  - Live S&P 100 membership at start date — rejected (survivorship).
-  - Point-in-time membership reconstruction — rejected (scope).
-  - Top-100-by-current-market-cap — rejected (circular: market cap
-    is a function of past returns).
-  - S&P 500 with market-cap filter applied each rebalance —
-    rejected (too much engineering for a 50-hour budget).
+The model isn't designed to predict market direction. It's designed to *rank* — to tell you which stocks to favor *relative to each other*, regardless of whether the market is going up or down.
 
 ---
 
-## ADR-006: Data cleaning thresholds (2026-04-30)
-**Decision**: Apply the following cleaning steps to the raw yfinance panel before feature computation:
-1. Drop equity rows with `volume == 0` (preserves indices, where volume is meaningless).
-2. Forward-fill `adj_close` gaps up to 2 trading days; drop rows still NaN after.
-3. Flag and drop rows with absolute one-day return > 50% (likely data errors or unhandled corporate actions).
+## What's actually interesting about it
 
-**Reasoning**: Cleaning is intentionally conservative — we'd rather lose a few rows than carry bad data into features. Forward-fill cap of 2 days prevents fabricating multi-day signal.
+The proposal made three claims that the implementation actually backs up.
 
-**Trade-offs**: Real ~50% one-day moves do occasionally happen (M&A announcements, earnings). The 50% threshold is high enough that we expect to drop ~0–5 rows per ticker over 8 years — acceptable loss given the alternative.
+**Walk-forward CV with proper embargo.** Five expanding-window folds, 20-day gap between train_end and test_start to prevent label leakage. Test period spans Feb 2021 – Nov 2023 across regime transitions (recovery, bear, recovery). 2024–2026 reserved as held-out sample never touched during model selection.
 
-**Audit results**: 209,272 input rows, 209,272 output rows, 0 dropped (zero-volume / spike / unfilled-NaN). The cleaning logic is structurally correct but had nothing to do because the universe (per ADR-005) consists of continuously-listed large-caps with no IPO gaps, splits mishandled by yfinance, or volume halts in the project window. Verified via post-clean diagnostics — see ADR-008.
+**Regime-aware evaluation.** Per-fold IC stratified by year, by trend regime (SPX vs 200-day MA), and by volatility regime (rolling 60-day realized vol vs expanding median). The four trend × vol cells reveal that RF is the only model with positive IC in all four — which is the case for picking it over models with higher tail Sharpe but worse stability.
 
----
+**Automated production pipeline.** Two GitHub Actions workflows:
+- **score.yml** runs every Monday morning, refreshes data, fetches the latest model checkpoint from a GitHub Release, scores all 100 stocks, and commits the ranked watchlist back to the repo.
+- **retrain.yml** runs on manual trigger (or quarterly cron when enabled), retrains the lead model on all data through today, and publishes the new checkpoint as a versioned Release asset.
 
-## ADR-007: MMC → MRSH ticker rename (2026-04-30)
-**Decision**: Use ticker MRSH (Marsh & McLennan) in the universe.
-yfinance returns full 2018-2026 history under MRSH; MMC fails.
-
-**Reasoning**: MMC was renamed to MRSH in January 2026. yfinance has
-back-stitched the historical data under the new symbol, so a single
-download under MRSH gives us the complete continuous price series
-for the same economic entity. No manual stitching required.
-
-**Trade-offs**: None — yfinance handled the rename transparently.
-
-**Note for future**: Other ticker-rename events to watch for in this
-universe over the project window: FB → META (2022, handled), FISV → FI
-(2023, dropped from universe in ADR-005). If yfinance flakes on
-another ticker mid-project, the diagnostic pattern (try old + new
-symbol, compare row counts and date ranges) is in chat history.
+The separation between scoring and retraining is the key engineering choice — scoring is cheap and frequent; retraining is expensive and infrequent. Most academic ML pipelines blur the two.
 
 ---
 
-## ADR-008: Data quality verified (2026-04-30)
-**Decision**: Treat the cleaned panel as production-ready for feature
-engineering. No further cleaning passes needed.
+## Decile portfolio simulation
 
-**Reasoning**: Post-clean diagnostics show:
-  - 101 tickers × 2,072 trading days = 209,272 rows, all complete.
-  - Zero NaNs in any OHLCV column.
-  - Per-ticker row counts identical (2,072 each) — no IPO/delisting
-    history gaps in the universe.
-  - Top-15 largest one-day moves all attributable to documented real
-    events (NFLX 2022 sub loss, META 2022 DAU shock, NVDA 2023 AI
-    rally start, ORCL 2025 cloud guidance, etc.). Largest move
-    35.95% (ORCL 2025-09-10), well under our 50% spike threshold.
+The IC measures *prediction quality*; the decile portfolio simulates *what trading on those predictions would actually have returned*. Long top decile, short bottom decile, 20-day non-overlapping rebalance, with transaction-cost sensitivity:
 
-**Trade-offs**: None — the data is what we'd hope for.
+| Model    | Sharpe (0 bps) | Sharpe (5 bps) | Sharpe (10 bps) |
+|----------|----------------|----------------|-----------------|
+| Linear   | 0.92           | 0.86           | 0.79            |
+| LightGBM | 0.72           | 0.63           | 0.54            |
+| RF       | 0.52           | 0.43           | 0.35            |
+| XGBoost  | 0.48           | 0.39           | 0.30            |
 
-**Note**: This level of cleanliness reflects the universe construction
-(ADR-005), not luck. Hand-curating to known continuously-listed
-large caps avoids the data quirks of less-liquid or recently-IPO'd
-names.
+A subtle finding: IC and Sharpe rankings disagree. Linear has the worst IC but the best Sharpe. Why? IC measures how well the *full cross-section* is ranked; Sharpe measures only how the *tails* (top vs bottom decile) perform. Linear's predictions cluster in the middle but separate the tails cleanly. RF's predictions are better-ranked overall but compress the tails through tree averaging.
+
+For a real fund, Sharpe matters more. For a research signal that feeds into a multi-strategy framework, IC matters more. Both metrics are reported.
 
 ---
 
-## ADR-009: Walk-forward fold configuration (2026-04-30)
-**Decision**: 5 folds with 756-day initial train, 126-day test
-periods, 20-day embargo, expanding train window.
+## Methodology highlights
 
-Effective coverage:
-- Fold 1: train 2018-01 → 2020-12, test 2021-02 → 2021-08
-- Fold 2: train 2018-01 → 2021-08, test 2021-08 → 2022-03
-- Fold 3: train 2018-01 → 2022-03, test 2022-03 → 2022-09
-- Fold 4: train 2018-01 → 2022-09, test 2022-10 → 2023-04
-- Fold 5: train 2018-01 → 2023-04, test 2023-05 → 2023-11
+Detail lives in [`docs/decisions.md`](docs/decisions.md), which logs every non-trivial design decision as a dated ADR. Headlines:
 
-Hold-out (unused by walk-forward CV): 2024-01 → 2026-03 (~28 months).
-
-**Reasoning**: 5 folds provide enough samples to compute mean IC and
-ICIR with reasonable confidence; 6-month test periods are long
-enough that per-fold IC isn't overly noisy; 3-year initial train
-gives the model enough history to learn cross-sectional patterns.
-
-The 2024-2026 portion of the data is deliberately unused by walk-
-forward CV. It serves as a BLIND HOLD-OUT for final evaluation —
-the chosen model (selected by walk-forward IC) is evaluated once
-on this held-out period to produce a final unbiased number. This
-is methodologically stronger than reporting only walk-forward IC
-because the hold-out has not been touched at any point during
-model selection or hyperparameter tuning.
-
-**Trade-offs**: We use 60% of available data for walk-forward CV
-and 30% as hold-out, with 10% lost to embargoes between folds and
-between fold 5 and the hold-out start. A more aggressive setup
-(more folds, shorter tests) would use more of the data but at the
-cost of less stable per-fold IC.
-
-**Alternatives considered**:
-  - 4 folds with longer test windows (rejected: fewer samples for ICIR).
-  - Rolling (not expanding) train windows (rejected per ADR-002).
-  - Using all data in walk-forward, no hold-out (rejected: the hold-
-    out is the only unbiased final evaluation we get).
-
-**Regime coverage caveat**: The 5 test folds span Feb 2021 – Nov
-2023, a period dominated by the post-COVID monetary-tightening
-cycle. Each fold's TRAINING set includes regime-diverse data
-(2018–2020 in particular), but the EVALUATION sets are concentrated
-in one macro regime. We mitigate via:
-  (1) the 2024–2026 hold-out as a genuinely out-of-regime final
-      test, with planned sub-stratification (2024 H1 / 2024 H2 /
-      2025 / 2026 Q1) for regime-transfer analysis;
-  (2) ICIR as primary model-selection criterion, which penalizes
-      models whose IC varies widely across folds.
-
-A more aggressive fold structure (3-month tests, more folds) was
-considered but rejected: shorter test windows produce unstable per-
-fold IC estimates, and the stretch-goal hold-out sub-stratification
-provides regime coverage at lower variance cost.
-
-A historical extension (download data back to 2008–2015) was also
-considered for broader regime coverage. Rejected on two grounds:
-(a) point-in-time index membership data is unavailable, so the
-universe would inherit deeper survivorship bias when reaching back
-into periods like the 2008 crisis where the index-vs-current-tickers
-map drifts substantially; (b) several names in the current universe
-(META, ABBV, KHC, ZTS, HCA, NOW, PYPL) IPO'd after 2010, requiring
-either ragged-history handling or universe substitution that erodes
-the "S&P 100" framing further. Documented as future work for a
-follow-on study with proper point-in-time membership.
-
+- **Universe**: 100 hand-curated large-cap US equities + ^GSPC market proxy. Survivorship bias is documented, not denied.
+- **Features**: 12 candidates (momentum, oscillators, volume, position-relative, beta, drawdown). Filtered to top 8 via LightGBM gain importance on Fold 1 train data only — selection on later folds would leak future information into model decisions.
+- **Label**: cross-sectional percentile rank of 20-day forward return. Realistic execution alignment: features at date *t* use OHLCV through close of *t*; trade fills at close of *t+1*; position closes at close of *t+21*. The 1-day lag prevents same-bar leakage.
+- **Models**: Ridge (linear baseline), Random Forest, XGBoost, LightGBM. Identical feature set across all four.
+- **Hyperparameter tuning**: small grid (~4–8 combinations per model), Fold 1 inner train/val split with embargo, ranked by ICIR not raw mean IC.
+- **No-lookahead test**: every feature must produce identical values when future prices are corrupted. Catches an entire class of subtle bugs in 0.5 seconds.
+- **SHAP stability across folds**: per-fold TreeSHAP for the RF model. Reveals that liquidity and beta features (`log_dollar_vol_60`, `beta_to_spx_60`) are stable across regimes; momentum features (`mom_12_1`, `pct_52w_high`) are regime-dependent.
+- **Cross-sectional standardization** was tested and rejected — tree models lost ~80% of their IC with rank-normalized features. Documented as ADR-012; an example of empirical testing overriding textbook recommendation.
 
 ---
 
-## ADR-010: Phase 4 walk-forward training results (2026-04-30)
-**Decision**: Random Forest is the lead candidate for downstream
-analysis (SHAP, regime breakdown, portfolio simulation). All four
-models are retained for the comparison table; final model selection
-will be re-confirmed after Phase 5 evaluation.
+## Repository structure
 
-**Findings**:
-  | Model  | Mean IC | ICIR  |
-  |--------|---------|-------|
-  | Linear | +0.006  | 0.106 |
-  | RF     | +0.022  | 0.579 |
-  | XGB    | +0.013  | 0.457 |
-  | LGB    | +0.015  | 0.432 |
+```
+src/sp100rank/
+  data/         # ingest (yfinance), clean, universe definition
+  features/     # 12 technical features, cross-sectional rank label, feature selection
+  models/       # 4-model registry, hyperparameter tuner, walk-forward trainer
+  eval/         # walk-forward fold generator, IC metrics, regime tagging, portfolio sim
+  interpret/    # SHAP stability across folds
+  pipeline/     # score.py + retrain.py — production entry points
 
-  Computed across 5 walk-forward folds (Feb 2021 - Nov 2023).
-  Tree models substantially outperform the linear baseline,
-  validating the proposal hypothesis that non-linear feature
-  interactions are needed for cross-sectional ranking.
+tests/          # 11 tests: no-lookahead, label alignment, fold boundaries, label range/uniformity
+docs/decisions.md          # 13 ADRs documenting every design choice
+.github/workflows/         # score.yml (weekly), retrain.yml (manual/quarterly)
 
-**Reasoning**: 
-- All three tree models produce IC > 2 standard errors above zero;
-  linear baseline is statistically indistinguishable from zero.
-- ICIR comparison ranks RF > XGB > LGB > Linear. RF's superior
-  ICIR (lower IC volatility across folds) is the headline result.
-- Fold-by-fold pattern shows clear regime dependence: every model
-  produces strongest IC in Fold 3 (2022 bear market, when factor
-  models historically work best) and weakest in Fold 5 (mid-2023
-  AI rally, when concentrated mega-cap returns break factor models).
-  This supports the regime-aware analysis planned for Phase 5.
+data/processed/   # Feature/model selection artifacts (committed):
+                  #   selected_features.json — chosen 8 features + ranking
+                  #   tuned_hyperparameters.json — chosen hyperparameters
+                  #   fold_ic_summary.csv — per-fold IC table
+                  #   shap_stability_rf.csv — feature importance per fold
+                  #   portfolio_diagnostics.csv — Sharpe by model + cost
+                  #   holdout_ic_rf.csv — hold-out evaluation result
 
-**Trade-offs**: Fold 1 results are slightly optimistic per ADR-004
-(features and hyperparameters were selected on Fold 1 train data).
-The Fold 2-5 average — RF mean IC +0.025, ICIR 0.69 — is the
-unbiased estimate.
+outputs/scores/   # Production scoring CSVs (committed by score.yml)
+```
 
-**Hyperparameters chosen** (from Fold 1 inner train/val split):
-  - Linear (Ridge): alpha = 10.0
-  - Random Forest:  max_depth = 12, min_samples_leaf = 50
-  - XGBoost:        max_depth = 4, learning_rate = 0.10
-  - LightGBM:       num_leaves = 15, learning_rate = 0.05
-
-  ---
-
-## ADR-011: Phase 5 evaluation results (2026-04-30)
-**Decision**: Random Forest is the lead model based on combined IC,
-ICIR, regime stability, and held-out evaluation. Linear baseline
-shows surprising portfolio Sharpe leadership but regime instability;
-documented as a finding rather than a recommendation.
-
-**Walk-forward IC by year**:
-  | Model  | 2021    | 2022    | 2023    |
-  |--------|---------|---------|---------|
-  | Linear | +0.017  | +0.061  | -0.063  |
-  | RF     | +0.040  | +0.045  | -0.022  |
-  | XGB    | +0.031  | +0.032  | -0.026  |
-  | LGB    | +0.051  | +0.021  | -0.029  |
-  
-  All four models lose skill in 2023. The 2023 AI rally (NVDA-led
-  mega-cap concentration) breaks factor-style cross-sectional ranking.
-
-**Regime breakdown — IC by Trend × Vol cell** (RF only):
-  - bear/high_vol: +0.033 (best)
-  - bull/high_vol: +0.016
-  - bear/low_vol:  +0.012
-  - bull/low_vol:  +0.016
-  
-  RF is the only model with positive IC in all 4 regime cells.
-
-**Cell sample-size caveats**: The four trend×vol cells are highly
-unbalanced — bull/low_vol has 355 days, bear/high_vol 194, bull/high_vol
-73, bear/low_vol just 8 days. The bear/low_vol cell is unreliable
-(SE of mean Spearman ≈ 0.30 at n=8); we exclude it from
-interpretation. The 73-day bull/high_vol cell warrants caveats but
-is interpretable. The two well-populated cells (bull/low_vol and
-bear/high_vol) carry the substantive findings.
-
-This imbalance is itself a finding: the test period (Feb 2021 - Nov
-2023) was dominated by bull / low_vol regime (355 days, 56% of
-total), with bear / high_vol the natural "second mode" (194 days,
-31%). The other two cells are transition periods, rare by
-construction.
-
-
-**SHAP stability**:
-  - log_dollar_vol_60: ranks 1-2 across all 5 folds (stable; robust)
-  - drawdown_60:       rank 8 across all 5 folds (consistently weakest)
-  - mom_12_1, pct_52w_high: rank swings widely (regime-dependent)
-  - macd_signal, beta_to_spx_60: moderately stable middle
-
-**Decile long-short portfolio (32 non-overlapping 20-day periods)**:
-  - Linear: Sharpe 0.92 / 0.86 / 0.79 at 0/5/10 bps
-  - LGB:    Sharpe 0.72 / 0.63 / 0.54
-  - RF:     Sharpe 0.52 / 0.43 / 0.35
-  - XGB:    Sharpe 0.48 / 0.39 / 0.30
-  
-  IC and Sharpe rankings disagree: Linear has the best tails
-  (largest top-decile minus bottom-decile spread) despite weakest IC.
-  This reflects different aspects of model behavior — IC measures
-  full-cross-section ranking, Sharpe measures tail discrimination.
-
-**Hold-out evaluation (RF trained on 2018-2023, evaluated 2024-2026)**:
-  - 2024 mean IC: -0.021 (negative — confirms regime-transfer concern)
-  - 2025 mean IC: +0.017
-  - 2026 Q1 IC:   +0.136 (small-sample, only 40 days)
-  - Full hold-out IC: +0.008, ICIR 0.05, t-stat 1.24
-  
-  The hold-out cannot reject H0: alpha = 0. This is the honest
-  unbiased estimate. The walk-forward IC was inflated by selection
-  effects (Fold 1 hyperparameter tuning, fold 1-5 within a single
-  macro regime). The 2024 negative IC is the project's most
-  important caveat.
-
-**Reasoning for RF lead despite Linear's higher Sharpe**:
-  - RF has positive IC in all 4 regime cells; Linear has 2 negative cells.
-  - RF's hold-out 2024 IC is also negative, but less severely than
-    Linear would be (we did not compute Linear hold-out, but its
-    2023 walk-forward IC of -0.063 is much worse than RF's -0.022).
-  - Sharpe estimate on 32 periods has SE ~0.3; the 0.40 spread
-    between Linear and RF Sharpe is barely outside one SE.
-  - Regime robustness matters more for production deployment than
-    a one-off Sharpe number.
-
-**What we'd do differently in v2**: tighter regime coverage in
-training (2008-2015 history with point-in-time membership), explicit
-regime-conditional models, more frequent retraining cadence than
-quarterly.
-
+The actual data files (`data/raw/*.parquet`, ~50 MB) and model pickles (`models/checkpoints/*.pkl`) are gitignored — too big and easily regenerable.
 
 ---
 
-## ADR-012: Cross-sectional rank normalization tested and rejected (2026-04-30)
-**Decision**: Cross-sectional rank-normalization of features was
-implemented and tested but REVERTED. The codebase retains the
-transformation function (`cross_sectional_rank_normalize` in
-technical.py) for documentation and future research, but
-`build_features_and_labels` defaults to `cross_sectional=False`.
+## Reproducing the results
 
-**Hypothesis tested**: Per-date rank-normalization of features would
-remove regime-level scale variation, letting the model focus on
-relative cross-sectional positioning rather than absolute scale.
-Standard practice in factor model literature.
+```bash
+git clone https://github.com/malithjd/sp100-rank.git
+cd sp100-rank
+uv sync                          # installs Python 3.12 + all deps
 
-**Result**: All three tree models regressed substantially. Linear
-showed marginal improvement.
+# Build data and features
+uv run python -m sp100rank.data.ingest    # ~3 min, downloads OHLCV
+uv run python -m sp100rank.data.clean     # ~10 sec, cleans + caches
 
-  | Model  | Mean IC (raw) | ICIR (raw) | Mean IC (rank-XS) | ICIR (rank-XS) |
-  |--------|---------------|------------|-------------------|----------------|
-  | Linear | +0.006        | 0.106      | +0.007            | 0.246          |
-  | RF     | +0.022        | 0.579      | +0.004            | 0.090          |
-  | XGB    | +0.013        | 0.457      | -0.001            | -0.024         |
-  | LGB    | +0.015        | 0.432      | +0.003            | 0.082          |
+# Run tests
+uv run pytest tests/ -v                   # 11 tests should pass
 
-**Reasoning for the regression** (best hypothesis):
-1. Tree models lose absolute-magnitude information that they
-   apparently rely on. A split on raw `mom_60 > 0.15` carries
-   regime-conditional information that becomes ambiguous after
-   rank-normalization (the 80th percentile means different
-   things in different regimes' raw distributions, but trees
-   were already implicitly conditioning on this).
-2. Rank-normalization homogenizes feature distributions, making
-   features more correlated and reducing the cross-feature
-   information the model can exploit.
+# Train RF on all data through today
+uv run python -m sp100rank.pipeline.retrain
+```
 
-**What this teaches**: Cross-sectional rank-normalization is a
-useful transformation for linear factor models (where it works
-as expected and ICIR mildly improved) but counter-productive for
-tree models on this kind of factor data. The textbook recommendation
-to always rank-normalize doesn't transfer cleanly to tree-based
-non-linear models.
-
-**Trade-offs**: Linear's modest improvement (ICIR 0.106 → 0.246)
-isn't enough to offset RF's collapse (ICIR 0.579 → 0.090) — the
-overall best-case model is RF on raw features. Reverted.
-
-**Alternatives we did NOT test** (out of scope for course project):
-  - Z-score normalization (might produce different result; outlier-
-    sensitive but preserves more magnitude info than rank).
-  - Hybrid: rank-normalize only the most regime-sensitive features
-    (momentum), keep others raw.
-  - Within-sector rank rather than within-universe.
+The exact IC numbers depend on yfinance's data state at the time you run; for the snapshot used in the report, see `FROZEN_DATA_END = "2026-03-31"` in `src/sp100rank/config.py`.
 
 ---
 
-## ADR-013: Production pipeline design (2026-05-03)
-**Decision**: Split scoring (frequent, weekly) from retraining
-(infrequent, manual / quarterly). Both run as GitHub Actions
-workflows on ubuntu-latest with uv-managed dependencies. Model
-checkpoints are stored as GitHub Release assets, fetched by score
-runs via `gh release download`.
+## The production pipeline
 
-**Reasoning**:
-1. Scoring is cheap and benefits from frequent updates (capture
-   recent market behavior in features). Retraining is expensive
-   and prone to overfitting on noise if done too often.
-2. GitHub Releases are designed for binary artifact distribution.
-   They handle versioning, large file storage (up to 2GB per asset),
-   and download authentication automatically. Better fit than git
-   LFS or committing pickle files to the repo.
-3. The two workflows are decoupled: scoring doesn't need retrain to
-   succeed in a given week (it uses the last successful release);
-   retrain doesn't need scoring to have run (it has its own data
-   refresh). Failure of one doesn't cascade to the other.
+Two automated workflows in `.github/workflows/`:
 
-**Date handling**: Two distinct constants in config.py:
-   - FROZEN_DATA_END = "2026-03-31" — the snapshot used for all
-     reported development results (Phase 4-5). Never changes.
-   - Production code calls `download_universe()` with `end=None`,
-     which defaults to today. Lets the workflow run on any date
-     without code changes, while preserving reproducibility of
-     reported numbers.
+**`score.yml`** — Every Monday at 14:00 UTC:
+1. Refreshes data from yfinance through today.
+2. Fetches the latest model checkpoint from a GitHub Release.
+3. Computes features, generates predictions for the latest date.
+4. Writes a ranked watchlist to `outputs/scores/scores_<date>.csv`.
+5. Commits the file back to main.
 
-**Trade-offs**: 
-- Scheduled cron is in UTC, not local market time. We chose 14:00
-  UTC to land before US market open. Acceptable because we don't
-  trade on the predictions in real time — the watchlist is for
-  reference.
-- yfinance occasionally rate-limits on cloud IP space. Our retry
-  logic with exponential backoff handles transient cases. If
-  systematic, we'd switch to a paid data feed.
-- 7-day cache staleness tolerance trades freshness for reduced
-  download cost. A workflow run on Monday with cache from previous
-  Friday accepts the cache; same workflow on next Monday rejects it
-  (8 days behind).
+**`retrain.yml`** — Manual trigger (or quarterly cron when enabled):
+1. Refreshes data, retrains RF on everything through today.
+2. Saves a timestamped pickle to `models/checkpoints/rf/`.
+3. Publishes the checkpoint as a versioned [GitHub Release](https://github.com/malithjd/sp100-rank/releases).
 
-**What's still missing**:
-- Email alerts on workflow failure (would add `actions/notify` step).
-- Model performance monitoring in production (would track per-week
-  IC of the previous week's predictions vs realized 20-day returns
-  and alert on degradation).
-- Both are out of scope for the course project; documented as
-  future work.
+Latest production output: see [`outputs/scores/`](outputs/scores/) for recent watchlists and [Releases](https://github.com/malithjd/sp100-rank/releases) for model history.
+
+---
+
+## Honest limitations
+
+- **Survivorship bias**: the 100-stock universe is hand-curated to names that exist today. Companies that were S&P 100 members during 2018–2026 but were removed (mergers, declines) aren't represented. Likely inflates IC by 0.005–0.015 vs a point-in-time membership panel. Documented in ADR-005.
+- **Regime coverage**: walk-forward test folds span Feb 2021 – Nov 2023, all within the post-COVID monetary-tightening regime. The 2024–2026 hold-out probes regime transfer; the 2024 IC of -0.021 demonstrates the cost. Documented in ADR-009.
+- **Universe size**: 100 stocks gives ~10 stocks per decile in the long-short portfolio. Tail estimates (Sharpe, max drawdown) have wide standard errors. A larger universe (S&P 500) would tighten these but is out of scope.
+- **Alpha decay**: the negative 2024 hold-out IC suggests factor signals on US large-caps may be decaying faster than quarterly retraining can keep up with.
+- **No transaction-cost realism beyond round-trip bps**: real transaction costs include market impact, borrowing costs for shorts, slippage. The 0/5/10 bps sensitivity is a simple linearization.
+
+---
+
+## Key references
+
+The methodology draws on canonical and recent work:
+
+- **Foundational**: Jegadeesh & Titman (1993, J. of Finance) for momentum; Lundberg & Lee (2017) for SHAP; López de Prado (2018) for purging/embargo CV.
+- **Modern factor ML**: Gu, Kelly & Xiu (2020, RFS) for empirical asset pricing via ML; Bryzgalova, Pelger & Zhu (2023, J. of Finance) for tree-based interpretability; Avramov, Cheng & Metzker (2023, Management Science) for ML alphas under economic restrictions.
+- **CV methodology**: Arian, Norouzi & Seco (2024, Knowledge-Based Systems) for backtest overfitting and CPCV — relevant context for our walk-forward choice (ADR-002).
+- **IC interpretation**: [Grinold (1989, J. of Portfolio Management)](https://app2.msci.com/products/analytics/aegis/PI_Converting_Scores_Into_Alphas.pdf) for the IC = 0.05 "good" / 0.10 "very good" benchmark; [Goodwin (1998)](https://tsgperformance.com/wp-content/uploads/2020/11/Goodwin-information-ratio.pdf) for information ratio.
+- **Practical context**: [Realized information coefficients are small in magnitude and volatile across time (arXiv 2010.08601)](https://arxiv.org/abs/2010.08601) — useful for calibrating expectations on what IC values are achievable.
+
+Full bibliography in `docs/decisions.md`.

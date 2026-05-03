@@ -43,12 +43,14 @@ The hold-out set 2024-01-01 → 2026-03-31 was never touched during walk-forward
 
 | Period       | Days | Mean IC  | What was happening |
 |--------------|------|----------|--------------------|
-| 2024 full    | 252  | **-0.021** | Post-AI-rally factor decay; concentrated mega-cap returns |
-| 2025 full    | 250  | **+0.017** | Factor signals partially recovering |
+| 2024 full    | 252  | **-0.021** | Post-COVID concentration unwinds slowly; mega-cap dominance still suppresses cross-sectional dispersion |
+| 2025 full    | 250  | **+0.017** | Cross-section re-broadens; factor signals partially recover |
 | 2026 Q1      | 40   | **+0.136** | Strong recovery (small sample, ±0.05 std error) |
 | **Combined** | **542** | **+0.008** | t-stat 1.24 (p ≈ 0.21) |
 
-The combined hold-out cannot statistically reject H0: alpha = 0. This is the unbiased final estimate. The 2024 negative IC is the project's most important finding — it demonstrates the regime-transfer cost of training on 2018–2023 data, exactly the kind of effect that walk-forward CV alone underestimates. The 2025–2026 recovery is consistent with the AI-rally distortion of 2023–2024 unwinding as the cross-section re-broadened.
+The combined hold-out cannot statistically reject H0: alpha = 0. This is the unbiased final estimate. The 2024 negative IC is the project's most important finding — it demonstrates the regime-transfer cost of training on 2018–2023 data, exactly the kind of effect that walk-forward CV alone underestimates.
+
+What looks like "the AI rally breaking the model" in 2023 is actually the visible tip of a four-year structural narrowing of the S&P 100 cross-section. COVID accelerated digital adoption asymmetrically toward mega-caps from 2020 onward; zero rates revalued long-duration growth upward through 2021; the 2022 rate cycle filtered out weak growth stocks but spared the dominant cash-flow machines; the AI narrative in 2023 then layered onto an already-concentrated cross-section. Factor models work best when the universe has healthy dispersion. They struggle when 7 names drive most of the index return. The 2025 recovery to +0.017 is consistent with this concentration partially unwinding as the cross-section re-broadens.
 
 This honest hold-out result is more informative than the in-sample walk-forward IC. Methodology mature enough to surface the regime-transfer problem instead of glossing it.
 
@@ -98,8 +100,6 @@ For a real fund, Sharpe matters more. For a research signal that feeds into a mu
 ---
 
 ## Methodology highlights
-
-
 
 Detail lives in [`docs/decisions.md`](docs/decisions.md), which logs every non-trivial design decision as a dated ADR. Headlines:
 
