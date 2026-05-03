@@ -2,7 +2,7 @@
 
 Cross-sectional return ranking for 100 large-cap U.S. equities. — by [Malith J. Don](https://www.linkedin.com/in/malithjayad/), 2026.
 
-![Today's Watchlist](images/01_watchlist.svg)
+![Today's Watchlist](images/01_watchlist.png)
 
 The system trains gradient-boosted models on technical features, evaluates them via walk-forward cross-validation across 5 folds, and exposes the lead model behind an automated GitHub Actions pipeline that retrains on demand and scores the universe weekly.
 
@@ -12,7 +12,7 @@ The system trains gradient-boosted models on technical features, evaluates them 
 
 Walk-forward CV across 5 folds, Feb 2021 – Nov 2023:
 
-![Per-fold IC](images/02_per_fold_ic.svg)
+![Per-fold IC](images/02_per_fold_ic.png)
 
 | Model        | Mean IC | ICIR  | Best fold | Worst fold |
 |--------------|---------|-------|-----------|------------|
@@ -28,6 +28,8 @@ A mean IC of 0.022 is modest in absolute terms — real-world ICs from professio
 ---
 
 ## Hold-out evaluation (year-by-year)
+
+![Walk-forward CV](images/03_walk_forward_cv.png)
 
 The hold-out set 2024-01-01 → 2026-03-31 was never touched during walk-forward CV, hyperparameter tuning, or feature selection. The Random Forest model was trained on all data through end-of-2023 and evaluated on this hold-out:
 
@@ -46,7 +48,7 @@ This honest hold-out result is more informative than the in-sample walk-forward 
 
 ## What this project does
 
-![Architecture](images/04_system_architecture.svg)
+![Architecture](images/04_system_architecture.png)
 
 Predicts which of 100 large-cap US stocks will outperform their peers over the next 20 trading days. The model produces a percentile rank per stock per date — values in [0, 1] where 0.95 means "expected to be in the top 5% of performers." A weekly watchlist tags the top 20% as BUY, bottom 20% as AVOID, middle 60% as HOLD.
 
@@ -123,7 +125,7 @@ For a real fund, Sharpe matters more. For a research signal that feeds into a mu
 
 ## Methodology highlights
 
-![Walk-forward CV](images/03_walk_forward_cv.svg)
+
 
 Detail lives in [`docs/decisions.md`](docs/decisions.md), which logs every non-trivial design decision as a dated ADR. Headlines:
 
