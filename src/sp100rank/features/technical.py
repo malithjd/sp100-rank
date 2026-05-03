@@ -422,6 +422,50 @@ def compute_all_features(prices: pd.DataFrame) -> pd.DataFrame:
     )
     return out
 
+def cross_sectional_rank_normalize(features: pd.DataFrame) -> pd.DataFrame:
+    """Cross-sectionally standardize features by rank within each date.
+
+    For each (date, feature) pair, compute the percentile rank of each
+    stock's value across the cross-section on that date. Result: every
+    feature column is a value in [0, 1] indicating "this stock's rank
+    on this feature on this date relative to the universe."
+
+    Why rank-based and not z-score:
+      - Robust to outliers (single extreme stock doesn't warp scale).
+      - Monotonic transform — trees retain all information; linear
+        models get a less-skewed feature distribution.
+      - Consistent range across all features makes it easier to compare
+        importance across features at training time.
+
+    Why this transformation helps:
+      - Removes regime-level scale variation. A stock with rank 0.95
+        on momentum is "top-5% momentum" regardless of whether the
+        cross-section ranges from -10% to +20% (calm regime) or -40%
+        to +40% (volatile regime).
+      - Lets the model focus on RELATIVE positioning (which is what
+        cross-sectional ranking models care about anyway) rather than
+        learning absolute scale relationships per regime.
+
+    Causal: rank within a date uses only that date's data. No future
+    information is referenced. The no-lookahead test continues to pass.
+
+    Parameters
+    ----------
+    features : MultiIndex (date, ticker) DataFrame from compute_all_features.
+
+    Returns
+    -------
+    DataFrame with same shape and columns. Values in [0, 1] per (date, feature).
+    NaN inputs remain NaN (rows in feature warmup periods).
+    """
+    # groupby on the 'date' level applies the rank computation to each
+    # date's cross-section independently. method='average' handles ties
+    # symmetrically; pct=True normalizes to [0, 1].
+    return (
+        features.groupby(level="date")
+                .rank(method="average", pct=True)
+    )
+
 
 def _features_for_one_ticker(
     df: pd.DataFrame,
