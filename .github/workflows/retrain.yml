@@ -6,8 +6,8 @@ name: Retrain Model
 # quarterly" design), uncomment the schedule line.
 on:
   workflow_dispatch: {}
-  # schedule:
-  #   - cron: "0 14 1 */3 *"   # 14:00 UTC on the 1st of every 3rd month
+  schedule:
+    - cron: "0 14 1 */3 *"   # 14:00 UTC on the 1st of every 3rd month
 
 jobs:
   retrain:
