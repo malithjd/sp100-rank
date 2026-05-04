@@ -177,7 +177,7 @@ Two automated workflows in `.github/workflows/`:
 4. Writes a ranked watchlist to `outputs/scores/scores_<date>.csv`.
 5. Commits the file back to main.
 
-**`retrain.yml`** — Manual trigger (or quarterly cron when enabled):
+**`retrain.yml`** — quarterly (or manually):
 1. Refreshes data, retrains RF on everything through today.
 2. Saves a timestamped pickle to `models/checkpoints/rf/`.
 3. Publishes the checkpoint as a versioned [GitHub Release](https://github.com/malithjd/sp100-rank/releases).
