@@ -44,9 +44,7 @@
   <!-- Zero line (bold) -->
   <line x1="120" y1="320" x2="920" y2="320" stroke="#000" stroke-width="1.5"/>
 
-  <!-- Y-axis labels (1 IC unit = 2000 px, so 0.05 = 100 px, 0.01 = 20 px) -->
-  <!-- 0.10 -> y=120, but chart top at y=160 means top is 0.08 -->
-  <!-- Recalculating: top y=160 = 0.08, zero y=320 = 0.0, so 1 unit = 2000 px ; 0.01 = 20 px -->
+  <!-- Y-axis labels -->
   <text x="112" y="165" text-anchor="end" font-size="13" fill="#444">+0.08</text>
   <text x="112" y="225" text-anchor="end" font-size="13" fill="#444">+0.05</text>
   <text x="112" y="325" text-anchor="end" font-size="14" fill="#000">0</text>
@@ -60,74 +58,53 @@
   <!-- BARS: 0.01 IC = 20px above/below zero line y=320 -->
   <!-- ============================================ -->
 
-  <!-- FOLD 1: bars at x=139, 168, 197, 226 -->
-  <!-- linear -0.011 -> h=22, y=320 -->
+  <!-- FOLD 1 -->
   <rect x="139" y="320" width="25" height="22" fill="#dc2626"/>
-  <!-- rf +0.020 -> h=40 -->
   <rect x="168" y="280" width="25" height="40" fill="#2563eb"/>
-  <!-- xgb +0.014 -> h=28 -->
   <rect x="197" y="292" width="25" height="28" fill="#000000"/>
-  <!-- lgb +0.029 -> h=58 -->
   <rect x="226" y="262" width="25" height="58" fill="#888888"/>
 
   <text x="195" y="475" text-anchor="middle" font-size="15" fill="#000">Fold 1</text>
   <text x="195" y="492" text-anchor="middle" font-size="11" fill="#888">2021 Feb–Aug</text>
 
-  <!-- FOLD 2: bars at x=304, 333, 362, 391 -->
-  <!-- linear +0.005 -> h=10 -->
+  <!-- FOLD 2 -->
   <rect x="304" y="310" width="25" height="10" fill="#dc2626"/>
-  <!-- rf +0.041 -> h=82 -->
   <rect x="333" y="238" width="25" height="82" fill="#2563eb"/>
-  <!-- xgb +0.029 -> h=58 -->
   <rect x="362" y="262" width="25" height="58" fill="#000000"/>
-  <!-- lgb +0.023 -> h=46 -->
   <rect x="391" y="274" width="25" height="46" fill="#888888"/>
 
   <text x="360" y="475" text-anchor="middle" font-size="15" fill="#000">Fold 2</text>
   <text x="360" y="492" text-anchor="middle" font-size="11" fill="#888">2021–22 transition</text>
 
-  <!-- FOLD 3: bars at x=469, 498, 527, 556 -->
-  <!-- linear +0.087 -> h=174 (clipped at top at +0.08 = y=160, so h=160) -->
+  <!-- FOLD 3 -->
   <rect x="469" y="160" width="25" height="160" fill="#dc2626"/>
-  <!-- mark with arrow showing it goes higher -->
   <text x="481" y="155" text-anchor="middle" font-size="11" fill="#dc2626">↑.087</text>
-  <!-- rf +0.073 -> h=146 -->
   <rect x="498" y="174" width="25" height="146" fill="#2563eb"/>
-  <!-- xgb +0.048 -> h=96 -->
   <rect x="527" y="224" width="25" height="96" fill="#000000"/>
-  <!-- lgb +0.057 -> h=114 -->
   <rect x="556" y="206" width="25" height="114" fill="#888888"/>
 
   <text x="525" y="475" text-anchor="middle" font-size="15" fill="#000">Fold 3</text>
   <text x="525" y="492" text-anchor="middle" font-size="11" fill="#888">2022 H1 (bear mkt)</text>
 
-  <!-- FOLD 4: bars at x=634, 663, 692, 721 -->
-  <!-- linear +0.005 -> h=10 -->
+  <!-- FOLD 4 -->
   <rect x="634" y="310" width="25" height="10" fill="#dc2626"/>
-  <!-- rf -0.021 -> h=42 -->
   <rect x="663" y="320" width="25" height="42" fill="#2563eb"/>
-  <!-- xgb -0.022 -> h=44 -->
   <rect x="692" y="320" width="25" height="44" fill="#000000"/>
-  <!-- lgb -0.034 -> h=68 -->
   <rect x="721" y="320" width="25" height="68" fill="#888888"/>
 
   <text x="690" y="475" text-anchor="middle" font-size="15" fill="#000">Fold 4</text>
   <text x="690" y="492" text-anchor="middle" font-size="11" fill="#888">2022 H2–23 H1</text>
 
-  <!-- FOLD 5: bars at x=799, 828, 857, 886 -->
-  <!-- linear -0.058 -> h=116, but bottom at y=440 (-0.06), so this fits as h=116 -->
+  <!-- FOLD 5 -->
   <rect x="799" y="320" width="25" height="116" fill="#dc2626"/>
-  <!-- rf -0.005 -> h=10 -->
   <rect x="828" y="320" width="25" height="10" fill="#2563eb"/>
-  <!-- xgb -0.005 -> h=10 -->
   <rect x="857" y="320" width="25" height="10" fill="#000000"/>
-  <!-- lgb -0.001 -> h=2 -->
   <rect x="886" y="320" width="25" height="2" fill="#888888"/>
 
   <text x="855" y="475" text-anchor="middle" font-size="15" fill="#000">Fold 5</text>
-  <text x="855" y="492" text-anchor="middle" font-size="11" fill="#888">2023 (AI rally)</text>
+  <text x="855" y="492" text-anchor="middle" font-size="11" fill="#888">2023 (concentrated rally)</text>
 
   <!-- Annotation -->
-  <text x="500" y="540" text-anchor="middle" font-size="14" fill="#666">factor models work in 2022 bear market · break in 2023 AI rally · regime sensitivity is real</text>
+  <text x="500" y="540" text-anchor="middle" font-size="14" fill="#666">factor models work in 2022 bear market · break in 2023 as cross-section narrows</text>
   <text x="500" y="570" text-anchor="middle" font-size="12" fill="#aaa">Random Forest is the only model with positive IC in 4 of 5 folds and the highest ICIR (0.58)</text>
 </svg>
