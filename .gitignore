@@ -51,9 +51,6 @@ outputs/scores/*
 figures/
 *.log
 
-# --- Images ---
-images/*
-!images/01_watchlist.png
-!images/02_per_fold_ic.png
-!images/03_walk_forward_cv.png
-!images/04_system_architecture.png
+
+# --- Misc ---
+testing.ipynb
