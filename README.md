@@ -2,6 +2,8 @@
 
 Cross-sectional return ranking for 100 large-cap U.S. equities. — by [Malith J. Don](https://www.linkedin.com/in/malithjayad/), 2026.
 
+Repo: [github.com/malithjd/sp100-rank](https://github.com/malithjd/sp100-rank) · Latest weekly picks: [/outputs/scores](https://github.com/malithjd/sp100-rank/tree/main/outputs/scores)
+
 ![Today's Watchlist](images/01_watchlist.png)
 
 The system trains gradient-boosted models on technical features, evaluates them via walk-forward cross-validation across 5 folds, and exposes the lead model behind an automated GitHub Actions pipeline that retrains on demand and scores the universe weekly.
@@ -23,7 +25,7 @@ Walk-forward CV across 5 folds, Feb 2021 – Nov 2023:
 
 Tree models substantially outperform the linear baseline. Random Forest leads on ICIR — both the highest mean IC and the most stable across folds.
 
-A mean IC of 0.022 is modest in absolute terms — real-world ICs from professional stock selection models are [generally small in magnitude and volatile across time](https://arxiv.org/abs/2010.08601). Grinold (referenced in [MSCI Barra's IC documentation](https://app2.msci.com/products/analytics/aegis/PI_Converting_Scores_Into_Alphas.pdf)) characterizes IC = 0.05 as "good" and IC = 0.10 as "very good," but realized ICs in practice are often smaller. For comparison, [top-quartile equity managers achieve annualized information ratios of around 0.5](https://en.wikipedia.org/wiki/Information_ratio); our cross-sectional ICIR of 0.58 (annualized 2.05 via Grinold's fundamental law) is a *prediction signal* metric, not a portfolio implementation metric — the decile portfolio simulation below gives the realistic Sharpe.
+A mean IC of 0.022 is modest in absolute terms — real-world ICs from professional stock selection models are [generally small in magnitude and volatile across time](https://arxiv.org/abs/2010.08601). Grinold (referenced in [MSCI Barra's IC documentation](https://app2.msci.com/products/analytics/aegis/PI_Converting_Scores_Into_Alphas.pdf)) characterizes IC = 0.05 as "good" and IC = 0.10 as "very good," but realized ICs in practice are often smaller. For comparison, [top-quartile equity managers achieve annualized information ratios of around 0.5](https://en.wikipedia.org/wiki/Information_ratio); the cross-sectional ICIR of 0.58 (annualized 2.05 via Grinold's fundamental law) is a *prediction signal* metric, not a portfolio implementation metric — the decile portfolio simulation below gives the realistic Sharpe.
 
 ---
 
@@ -48,15 +50,67 @@ The hold-out set 2024-01-01 → 2026-03-31 was never touched during walk-forward
 | 2026 Q1      | 40   | **+0.136** | Strong recovery (small sample, ±0.05 std error) |
 | **Combined** | **542** | **+0.008** | t-stat 1.24 (p ≈ 0.21) |
 
-The combined hold-out cannot statistically reject H0: alpha = 0. This is the unbiased final estimate. The 2024 negative IC is the project's most important finding — it demonstrates the regime-transfer cost of training on 2018–2023 data, exactly the kind of effect that walk-forward CV alone underestimates.
+The combined hold-out cannot statistically reject H0: alpha = 0. This is the unbiased final estimate.
 
 What looks like "the AI rally breaking the model" in 2023 is actually the visible tip of a four-year structural narrowing of the S&P 100 cross-section. COVID accelerated digital adoption asymmetrically toward mega-caps from 2020 onward; zero rates revalued long-duration growth upward through 2021; the 2022 rate cycle filtered out weak growth stocks but spared the dominant cash-flow machines; the AI narrative in 2023 then layered onto an already-concentrated cross-section. Factor models work best when the universe has healthy dispersion. They struggle when 7 names drive most of the index return. The 2025 recovery to +0.017 is consistent with this concentration partially unwinding as the cross-section re-broadens.
 
-This honest hold-out result is more informative than the in-sample walk-forward IC. Methodology mature enough to surface the regime-transfer problem instead of glossing it.
+---
+
+## Live forward backtests: what $10,000 would have done
+
+Two forward-walking backtests of the production strategy with **monthly retraining** — same model, same code, two windows. The contrast is the point.
+
+**Setup:** $10K starting capital, hold the top-5 ranked stocks equal-weighted, rebalance monthly, 5 bps round-trip transaction cost, SPY buy-and-hold as benchmark.
+
+### 6-month window — Dec 2025 → May 2026
+
+![6-month backtest](images/06_backtest_6mo_equity.png)
+
+| Strategy (top-5 long-only) | SPY | Excess |
+|---|---|---|
+| **+17.5%** | +6.5% | **+10.9%** |
+
+Looks great. But this window starts *after* the worst of the underperformance regime had passed and ends inside the strong 2026 Q1 recovery — selection-biased. A different start date a few months earlier produces the opposite verdict.
+
+### 18-month window — Nov 2024 → May 2026
+
+![18-month backtest](images/05_backtest_18mo_equity.png)
+
+| Strategy (top-5 long-only) | SPY | Excess |
+|---|---|---|
+| **-3.6%** | +28.5% | **-32.1%** |
+
+The 18-month window covers the entire post-hold-out period and removes the start-date selection bias. The strategy underperforms SPY by 32 percentage points. The recovery in April–May 2026 is visible but recovers only a fraction of the prior loss.
+
+### Holdings comparison: why the strategy struggled
+
+![Holdings 6-month](images/07_holdings_6mo.png)
+
+*6-month window: **19 unique tickers** across 6 monthly rebalances. INTC every month; AON, MSFT, AMZN, NVDA recurring. Concentrated picks during a single regime.*
+
+![Holdings 18-month](images/08_holdings_18mo.png)
+
+*18-month window: **39 unique tickers** across 19 monthly rebalances. The model rotates between sectors — consumer staples, healthcare, defensives, then back to tech — as the regime shifts faster than monthly retraining can absorb.*
+
+Monthly retraining isn't enough. The cross-section structure was changing on a 6–12 month timescale; the model kept adapting but couldn't lock onto a stable theme until April 2026.
+
+### Market-neutral test — long top-5, short bottom-5
+
+To isolate the IC signal from market direction. $5K long, $5K short, 50 bps annual borrow cost.
+
+**Result over 18 months: -20.2% (-48.6% vs SPY).**
+
+A negative long-short return means the bottom-5 picks systematically outperformed the top-5 picks. The cross-sectional ordering had inverted relative to training-period dynamics.
+
+### The practical lesson
+
+When hold-out testing cannot reject H0: alpha = 0 (t-stat 1.24 in this project), the appropriate prior is that the strategy adds no value. The rational default is the cheapest-and-most-diversified alternative — SPY. This conclusion aligns with [SPIVA U.S. Scorecard reports](https://www.spglobal.com/spdji/en/research-insights/spiva/) showing 70–90% of active equity managers underperform their benchmarks over 10+ year horizons.
+
+The forward backtest isn't a project failure. It's the most honest finding: a model with positive in-sample IC, rigorous walk-forward methodology, and proper regime evaluation can still lose to passive index investing in real-world deployment when the underlying market structure has changed.
 
 ---
 
-## What this project does (aka Simple Architecture)
+## What this project does
 
 ![Architecture](images/04_system_architecture.png)
 
@@ -121,22 +175,21 @@ src/sp100rank/
   data/         # ingest (yfinance), clean, universe definition
   features/     # 12 technical features, cross-sectional rank label, feature selection
   models/       # 4-model registry, hyperparameter tuner, walk-forward trainer
-  eval/         # walk-forward fold generator, IC metrics, regime tagging, portfolio sim
+  eval/         # walk-forward fold generator, IC metrics, regime tagging, portfolio sim, backtest engine
   interpret/    # SHAP stability across folds
   pipeline/     # score.py + retrain.py — production entry points
 
 tests/          # 11 tests: no-lookahead, label alignment, fold boundaries, label range/uniformity
-docs/decisions.md          # 13 ADRs documenting every design choice
+docs/decisions.md          # 14 ADRs documenting every design choice
 .github/workflows/         # score.yml (weekly), retrain.yml (manual/quarterly)
 
-data/processed/   # Feature/model selection artifacts (committed):
-                  #   selected_features.json — chosen 8 features + ranking
-                  #   tuned_hyperparameters.json — chosen hyperparameters
-                  #   fold_ic_summary.csv — per-fold IC table
-                  #   shap_stability_rf.csv — feature importance per fold
-                  #   portfolio_diagnostics.csv — Sharpe by model + cost
-                  #   holdout_ic_rf.csv — hold-out evaluation result
+data/processed/   # Feature/model selection + backtest artifacts (committed):
+                  #   selected_features.json, tuned_hyperparameters.json
+                  #   fold_ic_summary.csv, shap_stability_rf.csv
+                  #   portfolio_diagnostics.csv, holdout_ic_rf.csv
+                  #   backtest_18mo_*.csv, backtest_default_*.csv
 
+figures/          # Backtest equity curves + holdings grids
 outputs/scores/   # Production scoring CSVs (committed by score.yml)
 ```
 
@@ -149,20 +202,25 @@ The actual data files (`data/raw/*.parquet`, ~50 MB) and model pickles (`models/
 ```bash
 git clone https://github.com/malithjd/sp100-rank.git
 cd sp100-rank
-uv sync                          # installs Python 3.12 + all deps
+uv sync                                            # Python 3.12 + all deps
 
 # Build data and features
-uv run python -m sp100rank.data.ingest    # ~3 min, downloads OHLCV
-uv run python -m sp100rank.data.clean     # ~10 sec, cleans + caches
+uv run python -m sp100rank.data.ingest             # ~3 min, downloads OHLCV
+uv run python -m sp100rank.data.clean              # ~10 sec, cleans + caches
 
 # Run tests
-uv run pytest tests/ -v                   # 11 tests should pass
+uv run pytest tests/ -v                            # 11 tests should pass
 
 # Train RF on all data through today
 uv run python -m sp100rank.pipeline.retrain
+
+# Reproduce the backtests
+uv run python -m sp100rank.eval.backtest --tag 18mo                              # 18-month default
+uv run python -m sp100rank.eval.backtest --start 2025-12-01 --tag 6mo            # 6-month
+uv run python -m sp100rank.eval.backtest --mode long_short --tag 18mo_ls         # market-neutral
 ```
 
-The exact IC numbers depend on yfinance's data state at the time you run; for the snapshot used in the report, see `FROZEN_DATA_END = "2026-03-31"` in `src/sp100rank/config.py`.
+The exact IC numbers depend on yfinance's data state at the time of run; for the snapshot used in the report, see `FROZEN_DATA_END = "2026-03-31"` in `src/sp100rank/config.py`.
 
 ---
 
@@ -182,17 +240,19 @@ Two automated workflows in `.github/workflows/`:
 2. Saves a timestamped pickle to `models/checkpoints/rf/`.
 3. Publishes the checkpoint as a versioned [GitHub Release](https://github.com/malithjd/sp100-rank/releases).
 
-Latest production output: see [`outputs/scores/`](outputs/scores/) for recent watchlists and [Releases](https://github.com/malithjd/sp100-rank/releases) for model history.
+Latest production output: see [`outputs/scores/`](https://github.com/malithjd/sp100-rank/tree/main/outputs/scores) for recent watchlists and [Releases](https://github.com/malithjd/sp100-rank/releases) for model history.
 
 ---
 
 ## Honest limitations
 
 - **Survivorship bias**: the 100-stock universe is hand-curated to names that exist today. Companies that were S&P 100 members during 2018–2026 but were removed (mergers, declines) aren't represented. Likely inflates IC by 0.005–0.015 vs a point-in-time membership panel. Documented in ADR-005.
-- **Regime coverage**: walk-forward test folds span Feb 2021 – Nov 2023, all within the post-COVID monetary-tightening regime. The 2024–2026 hold-out probes regime transfer; the 2024 IC of -0.021 demonstrates the cost. Documented in ADR-009.
-- **Universe size**: 100 stocks gives ~10 stocks per decile in the long-short portfolio. Tail estimates (Sharpe, max drawdown) have wide standard errors. A larger universe (S&P 500) would tighten these but is out of scope.
-- **Alpha decay**: the negative 2024 hold-out IC suggests factor signals on US large-caps may be decaying faster than quarterly retraining can keep up with.
-- **No transaction-cost realism beyond round-trip bps**: real transaction costs include market impact, borrowing costs for shorts, slippage. The 0/5/10 bps sensitivity is a simple linearization.
+- **Regime coverage**: walk-forward test folds span Feb 2021 – Nov 2023, all within the post-COVID monetary-tightening regime. The 2024–2026 hold-out and 18-month live backtest both probe regime transfer; both surface the cost. Documented in ADR-009 and ADR-014.
+- **Universe size**: 100 stocks gives ~10 stocks per decile in the long-short portfolio and only 5 stocks in the top-K long-only strategy. Tail estimates have wide standard errors and the top-5 strategy can't compete with market-cap-weighted SPY during concentration regimes.
+- **Loss-metric mismatch**: training on squared error but evaluating on Spearman IC. LambdaRank or differentiable Spearman would directly optimize the ranking metric.
+- **No L1 / elastic net**: only L2 regularization is tested in the linear baseline. Lasso or elastic net would give automatic feature selection.
+- **No transaction-cost realism beyond round-trip bps**: real costs include market impact, borrowing costs for shorts, slippage. The 0/5/10 bps sensitivity is a simple linearization.
+- **No regime-detection layer**: the model rotates monthly but can't tell whether the current regime favors the strategy. A separate classifier on cross-section concentration would let the system switch to SPY when its own t-statistic is below threshold.
 
 ---
 
@@ -202,8 +262,7 @@ The methodology draws on canonical and recent work:
 
 - **Foundational**: Jegadeesh & Titman (1993, J. of Finance) for momentum; Lundberg & Lee (2017) for SHAP; López de Prado (2018) for purging/embargo CV.
 - **Modern factor ML**: Gu, Kelly & Xiu (2020, RFS) for empirical asset pricing via ML; Bryzgalova, Pelger & Zhu (2023, J. of Finance) for tree-based interpretability; Avramov, Cheng & Metzker (2023, Management Science) for ML alphas under economic restrictions.
-- **CV methodology**: Arian, Norouzi & Seco (2024, Knowledge-Based Systems) for backtest overfitting and CPCV — relevant context for our walk-forward choice (ADR-002).
+- **CV methodology**: Arian, Norouzi & Seco (2024, Knowledge-Based Systems) for backtest overfitting and CPCV — relevant context for the walk-forward choice (ADR-002).
 - **IC interpretation**: [Grinold (1989, J. of Portfolio Management)](https://app2.msci.com/products/analytics/aegis/PI_Converting_Scores_Into_Alphas.pdf) for the IC = 0.05 "good" / 0.10 "very good" benchmark; [Goodwin (1998)](https://tsgperformance.com/wp-content/uploads/2020/11/Goodwin-information-ratio.pdf) for information ratio.
 - **Practical context**: [Realized information coefficients are small in magnitude and volatile across time (arXiv 2010.08601)](https://arxiv.org/abs/2010.08601) — useful for calibrating expectations on what IC values are achievable.
-
-Full bibliography in `docs/decisions.md`.
+- **Active vs passive**: [S&P Dow Jones SPIVA U.S. Scorecard](https://www.spglobal.com/spdji/en/research-insights/spiva/) — industry consensus that 70–90% of active equity managers underperform their benchmarks over 10+ years; relevant context for the "default to SPY when null fails" conclusion.
