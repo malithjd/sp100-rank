@@ -26,64 +26,32 @@ from sklearn.preprocessing import StandardScaler
 
 from sp100rank.config import RANDOM_SEED
 
-
-# === Hyperparameter grids ===
-#
-# Each grid is dict[param_name -> list_of_values]. We enumerate the
-# Cartesian product during tuning. Small intentionally — the proposal
-# specifies a small grid, and the marginal IC gain from larger grids
-# rarely justifies the time.
-
 GRIDS: dict[str, dict[str, list]] = {
     "linear": {
-        # Ridge regularization. Wider than tree grids because Ridge
-        # is computationally cheap.
         "alpha": [0.1, 1.0, 10.0, 100.0],
     },
     "rf": {
-        # RF is robust to most settings; tune the two that matter.
-        # n_estimators=300 fixed (more trees = more stable, diminishing
-        # returns past 300).
         "max_depth":         [6, 12],
         "min_samples_leaf":  [50, 200],
     },
     "xgb": {
-        # The two knobs that matter most for cross-sectional ranking.
         "max_depth":     [4, 6],
         "learning_rate": [0.05, 0.10],
     },
     "lgb": {
-        # Same idea — depth and rate.
         "num_leaves":    [15, 31],
         "learning_rate": [0.05, 0.10],
-    },
+    }
 }
 
 
-# === Model wrappers ===
-#
-# Each class has a uniform .fit(X, y) and .predict(X). They internally
-# handle their model-specific quirks (sklearn vs native APIs, scaling,
-# NaN handling).
-
-
 class _LinearModel:
-    """Ridge regression with feature standardization.
-
-    Linear models are scale-sensitive. Tree models are not. We
-    standardize ONLY for the linear model. The scaler is fit on
-    training data only — predict() uses the fitted scaler to
-    transform test data, never re-fitting.
-    """
     def __init__(self, alpha: float = 1.0, **_):
         self.alpha = alpha
         self.scaler = StandardScaler()
         self.model = Ridge(alpha=alpha, random_state=RANDOM_SEED)
 
     def fit(self, X: pd.DataFrame, y: pd.Series) -> "_LinearModel":
-        # Drop any remaining NaN rows. Trees handle NaN; Ridge errors
-        # on them. We drop ON TRAIN SIDE — at predict time, NaN inputs
-        # would also need handling (we'll fillna at the call site).
         mask = X.notna().all(axis=1) & y.notna()
         X_clean = X[mask]
         y_clean = y[mask]

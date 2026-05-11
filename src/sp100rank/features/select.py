@@ -50,26 +50,7 @@ def select_features_by_gain(
       - selected_features: list of column names, ordered by gain (most first).
       - importance_series: full feature ranking (all 12), indexed by name.
         Useful for the writeup table.
-
-    Implementation notes:
-      - We use LightGBM with conservative defaults — selection is about
-        a STABLE feature ranking, not best-fit. Tuning hyperparameters
-        for selection adds noise (different params → different rankings).
-      - n_estimators=300 is plenty for ranking purposes. The per-feature
-        gain stabilizes well before the model converges.
-      - min_child_samples=50 is higher than LightGBM's default (20).
-        Financial data has heavy tails; higher leaf size prevents the
-        model from finding a split on 5 outliers and assigning huge
-        importance to a feature that doesn't deserve it.
-      - importance_type='gain' (total reduction in loss attributable
-        to splits on each feature) is more stable than 'split' (raw
-        split count). Per Lundberg et al., 'gain' aligns better with
-        feature contribution to predictions.
     """
-    # Drop rows with any NaN. LightGBM CAN handle NaNs natively in
-    # features, but we want a clean fit for ranking purposes.
-    # NaN handling differs between models; selecting on a NaN-free
-    # subset gives a model-agnostic ranking.
     aligned = pd.concat(
         {"y": y_train, **{c: X_train[c] for c in X_train.columns}},
         axis=1,
@@ -96,7 +77,6 @@ def select_features_by_gain(
     model.fit(X, y)
 
     # 'gain' importance from the booster. .feature_importance(type='gain')
-    # returns a numpy array aligned with X.columns; we wrap as Series.
     importance = pd.Series(
         model.booster_.feature_importance(importance_type="gain"),
         index=X.columns,

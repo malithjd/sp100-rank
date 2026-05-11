@@ -3,7 +3,7 @@
 Assemble feature matrix and label series, sliced to a date window.
 
 Pipeline-orchestration helper used by both feature selection and
-model training. Single function — keep it simple.
+model training. Single function, keep it simple.
 """
 
 from __future__ import annotations
@@ -36,9 +36,6 @@ def build_features_and_labels(
     panel = load_clean_panel()
     X = compute_all_features(panel)
 
-    # Optional cross-sectional rank normalization. ON by default
-    # (improves IC; rank-stationary across regimes; outlier-robust).
-    # Set to False only for debugging or comparison with raw features.
     if cross_sectional:
         from sp100rank.features.technical import cross_sectional_rank_normalize
         X = cross_sectional_rank_normalize(X)
@@ -46,14 +43,10 @@ def build_features_and_labels(
     y = cross_sectional_rank_label(panel)
 
     if start is not None or end is not None:
-        # Slice both X and y to the date window. Inclusive on both sides.
-        # Use IndexSlice for clarity on MultiIndex slicing.
         idx = pd.IndexSlice
         X = X.loc[idx[start:end, :], :]
         y = y.loc[idx[start:end, :]]
 
-    # Align: y is missing for SPX (we excluded it). Inner-join so X
-    # only contains rows that have labels too.
     common_idx = X.index.intersection(y.index)
     X = X.loc[common_idx]
     y = y.loc[common_idx]

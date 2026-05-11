@@ -81,19 +81,14 @@ def compute_shap_stability(
             start=f.test_start, end=f.test_end,
         )
         X_test = X_test[selected]
-        # Drop NaN rows since RF can't take them at predict time
-        # (we filled them with mean during training; for SHAP we
-        # subsample non-NaN rows for cleaner attribution).
+        
         X_test_clean = X_test.dropna()
         if len(X_test_clean) > sample_size:
             X_test_clean = X_test_clean.sample(
                 n=sample_size, random_state=RANDOM_SEED,
             )
 
-        # TreeExplainer auto-detects sklearn RF. feature_perturbation
-        # 'tree_path_dependent' uses the tree's own conditional
-        # expectations — correct for tree models when features are
-        # correlated (which ours are: mom_60 and mom_12_1).
+        
         explainer = shap.TreeExplainer(
             underlying,
             feature_perturbation="tree_path_dependent",

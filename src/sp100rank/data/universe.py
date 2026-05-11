@@ -44,10 +44,8 @@ SP100_TICKERS: list[str] = [
 SPX_TICKER: str = '^GSPC'
 
 def all_tickers() -> list[str]:
-    """Return the list of all tickers in the S&P 100 universe."""
     return SP100_TICKERS + [SPX_TICKER]
 
 def is_index(ticker: str) -> bool:
-    """Return True if the ticker is in index (not a stock) Useful when we need only the equities/stocks."""
     return ticker.startswith('^')
 

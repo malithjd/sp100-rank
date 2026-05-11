@@ -4,12 +4,8 @@ Download adjusted OHLCV data from yfinance for the project universe
 and cache to Parquet. Designed to be RESUMABLE — if a download fails
 halfway, rerunning picks up where it left off.
 
-Why Parquet: columnar, compressed, fast. A panel of 102 tickers x 8
-years x 5 columns is ~50MB as Parquet vs ~500MB as CSV, and reads in
-~0.5s vs ~10s.
-
 Why per-ticker files (not one big file): if yfinance fails on ticker
-N of 102, we keep the first N-1 files and only retry the failed ones.
+N of 101, we keep the first N-1 files and only retry the failed ones.
 The combined panel is built at the end via concat.
 """
 
@@ -30,15 +26,12 @@ _YF_COLUMN_RENAME = {
     "High":      "high",
     "Low":       "low",
     "Close":     "close",
-    "Adj Close": "adj_close",   # split/dividend adjusted
+    "Adj Close": "adj_close",
     "Volume":    "volume",
 }
 
 def _ticker_path(ticker: str) -> Path:
-    """Where the raw Parquet for one ticker lives.
-
-    yfinance ticker symbols can contain '^' (indices) and '-' (share
-    classes). Filesystems handle '-' fine but '^' is best avoided. We
+    """Filesystems handle '-' fine but '^' is best avoided. We
     replace it with '_idx_' for filename safety. The original ticker
     is preserved in the DataFrame's column.
     """
@@ -52,16 +45,6 @@ def _download_one(
     retries: int = 3,
     sleep_seconds: float = 2.0,
 ) -> pd.DataFrame:
-    """Download a single ticker with retries.
-
-    yfinance occasionally returns an empty DataFrame on transient
-    failures (network blip, rate limit). The fix is "wait a bit and
-    try again." We exponentially back off so retry 1 waits 2s, retry
-    2 waits 4s, retry 3 waits 8s.
-
-    Raises RuntimeError after exhausting retries — caller is expected
-    to log and continue with other tickers, then come back to failures.
-    """
     last_err: Exception | None = None
 
     for attempt in range(1, retries + 1):
@@ -74,13 +57,8 @@ def _download_one(
                 # AND a separate Adj Close column. We need both: unadjusted
                 # for volume (which isn't adjusted), adjusted for returns.
                 auto_adjust=False,
-                # Don't print a progress bar — clutters logs.
                 progress=False,
-                # Force a single-level column index. yfinance defaults
-                # changed in v0.2.x to a MultiIndex even for one ticker;
-                # this normalizes to flat columns.
                 multi_level_index=False,
-                # Be polite on retries.
                 threads=False,
             )
 
@@ -107,10 +85,6 @@ def _normalize(df: pd.DataFrame, ticker: str) -> pd.DataFrame:
     sometimes returns tz-aware indexes which pandas merges hate).
     """
     df = df.rename(columns=_YF_COLUMN_RENAME)
-
-    # Some yfinance versions return columns we don't expect (e.g.,
-    # 'Dividends', 'Stock Splits' when auto_adjust=True). Keep only
-    # the OHLCV+adj_close set.
     expected = ["open", "high", "low", "close", "adj_close", "volume"]
     missing = [c for c in expected if c not in df.columns]
     if missing:
@@ -137,7 +111,7 @@ def download_universe(
     ----------
     start, end : ISO date strings (inclusive on start, exclusive on end
         per yfinance convention). yfinance's `end` is exclusive; if you
-        want data through 2026-03-31, pass end='2026-04-01'. We add one
+        want data through 2026-03-31, pass end='2026-04-01'. I add one
         day inside this function so callers can pass intuitive dates.
     refresh : if False, skip tickers whose cache file already exists.
         Set True when you suspect data corruption or a yfinance update.
@@ -164,9 +138,6 @@ def download_universe(
         prefix = f"[{i:>3}/{len(tickers)}] {ticker:<8}"
 
         if path.exists() and not refresh:
-            # Quick staleness check: if cached file's last date is
-            # within 7 days of today, accept the cache. Otherwise
-            # force a refresh of THIS ticker only.
             try:
                 cached = pd.read_parquet(path)
                 last_date = cached.index.max()
@@ -192,7 +163,7 @@ def download_universe(
             print(f"ok ({len(df)} rows)")
             statuses[ticker] = "ok"
             # Throttle: yfinance starts rate-limiting around 60 req/min.
-            # Half a second between bulk requests is safe.
+            # Half a second between bulk requests seemed safe.
             time.sleep(0.5)
         except Exception as e:
             print(f"FAILED: {e}")
@@ -231,7 +202,6 @@ def load_raw_panel() -> pd.DataFrame:
     frames = [pd.read_parquet(f) for f in files]
     panel = pd.concat(frames)
 
-    # Move ticker from a column to part of the index.
     panel = panel.set_index("ticker", append=True)
     # Reorder so date is the outer level.
     panel = panel.reorder_levels(["date", "ticker"]).sort_index()

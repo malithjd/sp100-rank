@@ -35,3 +35,6 @@ dev = [
     "jupyter>=1.1.1",
     "pytest>=9.0.3",
 ]
+
+[tool.uv]
+package = true
